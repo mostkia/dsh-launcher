@@ -42,6 +42,13 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+# No progress bar anywhere: Invoke-WebRequest writes its progress through the
+# host, and when the tray runs without a usable console (Task Scheduler, a hidden
+# runner, a piped stdout) that write fails with "Access is denied while reading
+# the console output buffer" - the request is then reported as failed even though
+# the server received it, which silently turns a graceful restart into a forced
+# one. Silencing progress removes that whole failure mode.
+$ProgressPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -Namespace DshTray -Name Win -MemberDefinition @'

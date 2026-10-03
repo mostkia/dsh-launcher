@@ -78,6 +78,27 @@ rejected with `403`) and live under the plugin's own namespace:
 | `POST` | `/_dsh-launcher/autostart/enable` | register the logon-start entry |
 | `POST` | `/_dsh-launcher/autostart/disable` | remove it |
 
+## Testing
+
+Both halves ship with a test that needs no real DSH session:
+
+```bash
+# host half: endpoints, guards, exit codes, autostart states (17 checks)
+node test/host-half.test.mjs
+
+# tray: the supervision probe and both restart paths, against a fake DSH
+powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
+```
+
+The tray test runs `test/fake-dsh.mjs` (a tiny HTTP server that speaks the
+plugin's endpoints) as the supervised child on a scratch port, so a real DSH is
+never started, killed or restarted. It pins the decision that matters: with a
+supervised child the tray asks the plugin and waits for the restart code, and
+with an unsupervised one it refuses to call the endpoint (which would answer
+`ok:false`) and forces the restart itself. Inside a confined shell `taskkill` is
+denied, so the kill step of the forced path cannot be observed there; the runner
+notes the limitation and the fake child exits on its own instead.
+
 ## Requirements
 
 - DSH **0.1.7 or newer** (uses `sidebar.footer.action`, `ctx.appExit`, and the

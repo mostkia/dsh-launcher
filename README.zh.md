@@ -61,6 +61,24 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 | `POST` | `/_dsh-launcher/autostart/enable` | 注册开机自启 |
 | `POST` | `/_dsh-launcher/autostart/disable` | 取消开机自启 |
 
+## 测试
+
+两半都带自测，不需要真实 dsh 会话：
+
+```bash
+# 宿主半部：端点、守卫、退出码、自启状态（17 项）
+node test/host-half.test.mjs
+
+# 托盘：监督探测与两条重启路径（对着假 dsh 跑）
+powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
+```
+
+托盘测试在临时端口用 `test/fake-dsh.mjs`（一个会说插件端点的小 HTTP 服务）当被监督的子进程，
+不会启动、杀掉或重启你的真实 dsh。它钉住的是最要紧的那个判断：子进程确实被监督时，
+托盘才去请求插件并等重启码；发现没被监督时**不去调那个必然回 `ok:false` 的端点**，
+自己强制重启。受限 shell 里 `taskkill` 会被拒绝，所以强制路径的"杀进程"那一步在那里观察不到，
+脚本会说明该限制（假子进程改为自行退出）。
+
 ## 环境要求
 
 - DSH **0.1.7 或更新**（用到 `sidebar.footer.action`、`ctx.appExit` 与 `webServer` 注册接口）。
