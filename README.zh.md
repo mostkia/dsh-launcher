@@ -79,6 +79,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 自己强制重启。受限 shell 里 `taskkill` 会被拒绝，所以强制路径的"杀进程"那一步在那里观察不到，
 脚本会说明该限制（假子进程改为自行退出）。
 
+维护者：发布前的自检、打标签与上架步骤见 [RELEASE.md](./RELEASE.md)。
+
 ## 环境要求
 
 - DSH **0.1.7 或更新**（用到 `sidebar.footer.action`、`ctx.appExit` 与 `webServer` 注册接口）。

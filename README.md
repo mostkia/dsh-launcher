@@ -99,6 +99,9 @@ with an unsupervised one it refuses to call the endpoint (which would answer
 denied, so the kill step of the forced path cannot be observed there; the runner
 notes the limitation and the fake child exits on its own instead.
 
+Maintainers: [RELEASE.md](./RELEASE.md) carries the pre-flight checks, the
+tagging steps and the optional market listing.
+
 ## Requirements
 
 - DSH **0.1.7 or newer** (uses `sidebar.footer.action`, `ctx.appExit`, and the

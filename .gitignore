@@ -2,6 +2,10 @@
 node_modules/
 pnpm-lock.yaml
 
+# Local npm pack output used by RELEASE.md.
+.npm-pack/
+*.tgz
+
 # Tray runtime leftovers, in case the tray is ever run from the source tree.
 tray/state/
 tray/*.log
