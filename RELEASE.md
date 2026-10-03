@@ -78,7 +78,9 @@ required. Values for this project:
 | install | `dsh plugin --profile web add github:mostkia/dsh-launcher` |
 
 Their tooling fills in version, stars and downloads; the pull request carries the
-repository and the texts only.
+repository and the texts only. Ready-made screenshots for the listing live in
+`docs/screenshots/` (light and dark dialog, tray window); they are not part of
+the published package.
 
 ## 6. Rollback
 

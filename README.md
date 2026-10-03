@@ -17,6 +17,16 @@ the tray keeps working if you remove the plugin (restart then falls back to a
 hard process-tree restart), and the plugin keeps working if you never install
 the tray (restart then reports that no supervisor is present and does nothing).
 
+## Screenshots
+
+| Power dialog, light | Power dialog, dark | Tray window |
+|:--:|:--:|:--:|
+| ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) | ![the tray's captured console window](docs/screenshots/tray-window.png) |
+
+The dialog follows the host theme because every colour, radius and shadow comes
+from theme tokens; the tray window shows the captured output with both UTF-8
+(Node) and OEM-encoded (PowerShell) Chinese rendered correctly.
+
 ## Install
 
 ```bash

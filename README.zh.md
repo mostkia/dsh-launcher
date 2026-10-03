@@ -13,6 +13,15 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 
 两半由**一个包**装出，但**不熔合**：卸掉插件，托盘照旧能用（重启降级为硬杀进程树）；没装托盘，插件也照旧能用（点"重启"会明确告诉你没有监督器，并且**不会**动你的进程）。
 
+## 截图
+
+| 电源弹窗（浅色） | 电源弹窗（深色） | 托盘窗口 |
+|:--:|:--:|:--:|
+| ![浅色主题下的电源弹窗](docs/screenshots/power-dialog-light.png) | ![深色主题下的电源弹窗](docs/screenshots/power-dialog-dark.png) | ![托盘抓取的控制台窗口](docs/screenshots/tray-window.png) |
+
+弹窗的颜色、圆角、阴影全部来自主题 token，所以跟随宿主明暗主题；托盘窗口里
+Node 的 UTF-8 与 PowerShell 的 OEM 编码中文都能正确显示。
+
 ## 安装
 
 ```bash
