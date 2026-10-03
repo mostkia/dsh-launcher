@@ -1,0 +1,15 @@
+# Dependencies are never installed for this package on purpose (see README).
+node_modules/
+pnpm-lock.yaml
+
+# Tray runtime leftovers, in case the tray is ever run from the source tree.
+tray/state/
+tray/*.log
+tray/dsh-launcher-hidden.log
+
+# Editor / OS noise.
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.swp

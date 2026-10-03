@@ -1,0 +1,55 @@
+# DSH Launcher tray - UI strings (UTF-8, no BOM; read explicitly as UTF-8).
+# Format: key=value, one per line. Lines starting with # are comments.
+# The .ps1 itself is pure ASCII on purpose: Windows PowerShell 5.1 decodes a
+# BOM-less UTF-8 script as GBK and would fail on Chinese literals.
+# Keep tray tooltips short (Windows limits a NotifyIcon tooltip to 63 chars).
+# Wording follows the plugin's power dialog (client.js): 电源 / 关机 / 重启 / 开机自启动.
+
+form.title.base=DSH 运行日志
+form.title.unmanaged=DSH 运行日志 — 未托管（外部实例）
+form.title.running=DSH 运行日志 — 运行中 (pid {0})
+form.title.stopped=DSH 运行日志 — 已停止 (退出码 {0})
+
+tray.tip.unmanaged=DSH 未托管
+tray.tip.running=DSH 运行中 (pid {0})
+tray.tip.stopped=DSH 已停止 (退出码 {0})
+
+menu.toggle=显示 / 隐藏输出窗口(&S)
+menu.run=启动 DSH(&R)
+menu.restart=重启 DSH 服务(&T)
+menu.autostart.off=开机自启动(&A)
+menu.autostart.on=开机自启动(&A)（已开启）
+menu.open=打开 DSH 界面(&O)
+menu.log=打开日志文件(&L)
+menu.quit=关闭 DSH 并退出托盘(&Q)
+
+balloon.title=DSH
+balloon.starting=DSH 正在启动
+balloon.startingtip=双击托盘图标可查看控制台输出。
+balloon.stopped.title=DSH 已停止
+balloon.stopped=子进程退出码 {0}，双击图标可查看输出。
+balloon.unmanaged=DSH 仍在运行（不是本托盘启动的），本托盘没有在托管它。
+balloon.startfail=启动失败：子进程无法创建。详见日志。
+balloon.restartok=已请求重启；退出码 42 会被托盘捕获并自动重拉。
+balloon.restartfail=重启请求失败：端口未响应或请求被拒绝。
+balloon.restartforced=插件端点不可用，托盘已直接重启 DSH。
+balloon.autostart.on=已开启开机自启动：登录 Windows 后将自动启动托盘与 DSH。
+balloon.autostart.off=已关闭开机自启动。
+balloon.autostart.failed=切换开机自启动失败：无法写入注册表。详见托盘日志。
+
+log.run=---- {0} 启动 DSH ----
+log.restart=---- {0} 请求重启 DSH ----
+log.relaunch=---- {0} 检测到退出码 42，自动重启 DSH ----
+log.restartforce=---- {0} 插件端点不可用，托盘直接重启 ----
+
+quit.title=DSH
+quit.text=确定要关闭 DSH 服务并退出托盘程序吗？
+
+already.head=检测到 127.0.0.1:{0} 上已有 DSH 在运行（不是本托盘启动的）。
+already.p1=本托盘需要自己拉起 dsh 才能托管它的输出与重启，所以请：
+already.p2=1. 在 DSH 界面里用「电源 → 关机」把它关掉；
+already.p3=2. 再重新双击桌面的 DSH Launcher 快捷方式。
+already.p4=现在这个托盘不会启动第二个 dsh；你可以用右键菜单「关闭 DSH 并退出托盘」结束它。
+
+startfail.body=启动失败：子进程无法创建（详见托盘日志）
+msg.trayrunning=DSH 托盘已在运行，请看右下角通知区域里的图标。

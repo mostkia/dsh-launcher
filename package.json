@@ -1,0 +1,65 @@
+{
+  "name": "@mostkia/dsh-launcher",
+  "version": "0.0.1",
+  "description": "Power controls (shutdown / restart) for DeepSeek Harness plus a Windows tray launcher that can restart it and show its console output.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
+    "tray",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "shutdown",
+    "restart",
+    "launcher",
+    "tray"
+  ],
+  "license": "MIT",
+  "author": "mostkia",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mostkia/dsh-launcher.git"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "meta": {
+    "title": "DSH Launcher",
+    "description": "Power controls in the sidebar and a Windows tray launcher for DSH."
+  },
+  "icon": "./icon.svg",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0-rc.7 <5.0.0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.1.7-0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.1.7-0",
+    "react": "^18.2.0"
+  }
+}

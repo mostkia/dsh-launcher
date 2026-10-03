@@ -1,0 +1,4 @@
+# @mostkia/dsh-launcher bundle patch: mounts the plugin into a profile layer stack.
+- insert:
+    - id: dsh-launcher
+      name: '@mostkia/dsh-launcher'
