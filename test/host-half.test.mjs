@@ -137,15 +137,22 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
   delete process.env.DSH_LAUNCHER_SUPERVISED;
 }
 
-// Autostart endpoints without an installation -> 409 tray-not-installed, no registry write.
+// Autostart is Windows-only, and the plugin says so instead of pretending. These
+// assertions therefore have two arms: the CI matrix runs this suite on Linux too,
+// where the first push showed them expecting Windows behaviour everywhere.
+const ON_WINDOWS = process.platform === 'win32';
+
+// Without an installation the plugin cannot register anything: 409 tray-not-installed
+// on Windows, 409 windows-only elsewhere - either way nothing reaches a registry.
 {
   const res = makeRes();
   routes.get(PREFIX + '/autostart/enable')(makeReq('POST', 'http://127.0.0.1:3080'), res);
   await new Promise((r) => setTimeout(r, 200));
   let parsed = null;
   try { parsed = JSON.parse(res.body); } catch { parsed = null; }
-  check('autostart/enable without tray -> 409 tray-not-installed',
-    res.statusCode === 409 && parsed !== null && parsed.error === 'tray-not-installed', JSON.stringify(parsed));
+  const expected = ON_WINDOWS ? 'tray-not-installed' : 'windows-only';
+  check('autostart/enable without a tray -> 409 ' + expected,
+    res.statusCode === 409 && parsed !== null && parsed.error === expected, JSON.stringify(parsed));
 }
 
 // A malformed install.json must be treated as "not installed", never crash.
@@ -172,7 +179,9 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
   let parsed2 = null;
   try { parsed2 = JSON.parse(res2.body); } catch { parsed2 = null; }
   check('valid install.json -> status body is the status document (raw: ' + res2.body + ')',
-    parsed2 !== null && parsed2.autostart !== undefined && parsed2.autostart.supported === true && parsed2.autostart.target === 'C:\\tmp\\x.vbs',
+    parsed2 !== null && parsed2.autostart !== undefined && (ON_WINDOWS
+      ? parsed2.autostart.supported === true && parsed2.autostart.target === 'C:\\tmp\\x.vbs'
+      : parsed2.autostart.supported === false && parsed2.autostart.reason === 'windows-only'),
     JSON.stringify(parsed2));
 
   // Disabling when nothing is registered must report success *and* not write: the
@@ -183,8 +192,11 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
   await new Promise((r) => setTimeout(r, 600));
   let parsed3 = null;
   try { parsed3 = JSON.parse(res3.body); } catch { parsed3 = null; }
-  check('autostart/disable while absent -> 200 ok:true',
-    res3.statusCode === 200 && parsed3 !== null && parsed3.ok === true && parsed3.enabled === false, JSON.stringify(parsed3));
+  check(ON_WINDOWS ? 'autostart/disable while absent -> 200 ok:true' : 'autostart/disable off Windows -> 409 windows-only',
+    ON_WINDOWS
+      ? res3.statusCode === 200 && parsed3 !== null && parsed3.ok === true && parsed3.enabled === false
+      : res3.statusCode === 409 && parsed3 !== null && parsed3.error === 'windows-only',
+    JSON.stringify(parsed3));
 }
 
 // A rebinding-shaped Origin (the page's host resolves to the loopback address) must
