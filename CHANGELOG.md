@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.1 — 2026-10-03
+
+### Added
+
+- `tray\uninstall.cmd` (backed by `tray\uninstall.ps1`): removes the tray that
+  `install.cmd` put on the machine. It stops a running tray that was started from
+  that directory, removes the start-at-logon value and the desktop shortcut - each
+  only when it points at that installation - and deletes the install directory.
+  `-DryRun` reports what would go without changing anything, `-KeepState` keeps the
+  logs in `state\`, `-NoStop` leaves a running tray alone.
+- `test\tray-uninstall.ps1`: pins those promises in scratch locations (scratch
+  install directory, scratch shortcut, scratch registry key, scratch tray process),
+  which the ownership guards make possible - so the suite proves the guards work
+  instead of trusting them.
+
+### Notes
+
+- The uninstaller never stops DSH: killing the tray leaves the DSH it supervised
+  running, and removing the plugin stays a separate step
+  (`dsh plugin --profile web remove @mostkia/dsh-launcher`).
+
 ## 0.1.0 — 2026-10-03
 
 First public release.

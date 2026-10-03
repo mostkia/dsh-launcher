@@ -31,12 +31,12 @@ const locale = paths.filter((path) => path.startsWith('locale/'));
 
 check('carries the runtime entry points', ['index.js', 'client.js', 'cordis.patch.yml', 'package.json', 'icon.svg'].every((path) => paths.includes(path)));
 check('carries both locale files', locale.length === 2, locale.join(', '));
-check('carries the whole tray (script, strings, vbs, icon, installer)', tray.length === 6, String(tray.length));
+check('carries the whole tray (script, strings, vbs, icon, installer, uninstaller)', tray.length === 8, String(tray.length));
 check('carries both READMEs and the licence', ['README.md', 'README.zh.md', 'LICENSE'].every((path) => paths.includes(path)));
 
 const forbidden = paths.filter((path) => /^(test|tools|docs|\.github|node_modules)\//.test(path) || path.endsWith('.tgz'));
 check('carries nothing repository-only', forbidden.length === 0, forbidden.join(', '));
-check('entry count matches the documented package (16)', entry.files.length === 16, String(entry.files.length));
+check('entry count matches the documented package (18)', entry.files.length === 18, String(entry.files.length));
 
 const failed = results.filter((ok) => !ok).length;
 console.log('\n' + (failed === 0 ? 'PACK CONTENTS PASS' : 'PACK CONTENTS FAIL: ' + failed + ' check(s)'));

@@ -43,6 +43,13 @@ jobs:
       # instead of the runner default (pwsh 7).
       - shell: powershell
         run: ./test/tray-supervision.ps1
+      # Same shell rationale: the uninstall suite drives the installer and the
+      # uninstaller against scratch locations (scratch install dir, shortcut,
+      # registry key and tray process), and is verified against Windows PowerShell
+      # 5.1.
+      - name: tray uninstall
+        shell: powershell
+        run: ./test/tray-uninstall.ps1
 
   pack:
     name: published contents
