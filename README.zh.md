@@ -26,7 +26,7 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 ```bash
 # 1) 插件（从 GitHub 装；建议钉住发布 tag）
 # 命令行输入运行：
-dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
+dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.1
 
 # 2) Windows 托盘（可选，但强烈建议安装，否则插件功能将不完整）
 # 在装好的包目录里运行：tray\install.cmd （双击，或在终端里执行）
@@ -36,6 +36,14 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 
 `tray\install.cmd` 会把托盘复制到 `%LOCALAPPDATA%\DSH-Launcher`，并在桌面创建 **DSH Launcher**
 快捷方式。插件**不会主动**开启开机自启，——那必须你显式开启。
+
+**卸载（与安装对称）**：
+
+1. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`
+2. 托盘：运行 `uninstall.cmd` —— 在安装目录 `%LOCALAPPDATA%\DSH-Launcher` 里，或用包目录下的
+   `tray\uninstall.cmd`。它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、删除安装目录；
+   但**不会**停 DSH —— DSH 只是不再被托管，你想什么时候关就什么时候关。
+   加 `-DryRun` 可先看它会删什么（不改动任何东西），加 `-KeepState` 则保留 `state\` 里的日志。
 
 ## 环境要求
 

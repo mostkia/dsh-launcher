@@ -32,7 +32,7 @@ Settings, and takes no row of its own.
 ```bash
 # 1. the plugin (from GitHub; pinning the release tag keeps it reproducible).
 #    In a terminal, run:
-dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
+dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.1
 
 # 2. the Windows tray (optional, but strongly recommended - without it the plugin
 #    is not complete). From the installed package directory, run:
@@ -45,6 +45,17 @@ composed, and refresh the page.
 `tray\install.cmd` copies the tray into `%LOCALAPPDATA%\DSH-Launcher` and creates a
 **DSH Launcher** desktop shortcut. The plugin never turns start-at-logon on by
 itself — you opt in explicitly.
+
+**To uninstall** (the mirror of the above):
+
+1. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`
+2. The tray: run `uninstall.cmd` — from the install directory
+   (`%LOCALAPPDATA%\DSH-Launcher`), or from `tray\uninstall.cmd` in the package.
+   It stops a running tray, clears the start-at-logon entry and the desktop
+   shortcut, and deletes the install directory. It never stops DSH: DSH simply
+   stops being supervised, and you close it whenever you like. Add `-DryRun` to see
+   what it would remove without changing anything, or `-KeepState` to keep the logs
+   in `state\`.
 
 ## Requirements
 
