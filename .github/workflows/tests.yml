@@ -1,0 +1,61 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    name: host + client (node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.19.0', '24.x']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # Both suites are offline: the host half stubs the cordis context and the
+      # web server, the client half stubs the browser module loader.
+      - run: node test/host-half.test.mjs
+      - run: node test/client-half.test.mjs
+
+  tray:
+    name: tray supervision (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      # Runs the tray headless against test/fake-dsh.mjs on port 3599 with a fake
+      # dsh.cmd on PATH: no real DSH is started, killed or restarted. The runner
+      # spawns powershell.exe (Windows PowerShell 5.1) for the tray itself, and the
+      # script is developed and verified against 5.1, so the step pins that shell
+      # instead of the runner default (pwsh 7).
+      - shell: powershell
+        run: ./test/tray-supervision.ps1
+
+  pack:
+    name: published contents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      # The published tarball must carry the runtime files only: no test/, no
+      # tools/, no docs/. test/pack-contents.test.mjs asserts exactly that.
+      - name: npm pack --dry-run
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > pack.json
+          node test/pack-contents.test.mjs pack.json

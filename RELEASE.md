@@ -13,8 +13,12 @@ node test/host-half.test.mjs            # 17 checks, exit 0
 node test/client-half.test.mjs          # 14 checks, exit 0
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
                                         # 9 assertions, exit 0
-npm pack --dry-run --cache .npm-pack    # 16 entries; test/ and tools/ absent
+npm pack --dry-run --json --cache .npm-pack > pack.json
+node test/pack-contents.test.mjs pack.json   # 6 assertions: runtime files only
 ```
+
+`.github/workflows/tests.yml` runs those same four suites on every push (with the
+tray suite on Windows PowerShell 5.1, the shell it is verified against).
 
 `--cache` keeps npm's cache inside the checkout. Without it npm writes to
 `%LOCALAPPDATA%\npm-cache`, which a confined shell refuses (`EPERM`).

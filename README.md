@@ -113,7 +113,9 @@ denied, so the kill step of the forced path cannot be observed there; the runner
 notes the limitation and the fake child exits on its own instead.
 
 Maintainers: [RELEASE.md](./RELEASE.md) carries the pre-flight checks, the
-tagging steps and the optional market listing.
+tagging steps and the optional market listing. Those suites, plus the
+package-contents check, run in CI on every push and pull request
+(`.github/workflows/tests.yml`).
 
 ## Requirements
 
