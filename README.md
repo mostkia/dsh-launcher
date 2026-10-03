@@ -7,15 +7,15 @@ start it, restart it and show its console output.
 
 ## What you get
 
+A complete power-and-launch plugin for stock DSH: shut-down and restart buttons
+(no more Ctrl+C in a terminal to stop the server), a real system launcher (a
+desktop shortcut plus start-at-logon), and tray management (no ugly console box
+left sitting on screen).
+
 | Part | Where it lives | What it does |
 |---|---|---|
-| **Power button** | DSH sidebar, in the official `sidebar.footer.action` seat right beside Settings | Opens a dialog with **Shut down** and **Restart** (each behind a second confirmation) and a **Start at logon** switch |
-| **Tray launcher** | `%LOCALAPPDATA%\DSH-Launcher`, started from a desktop shortcut | Starts `dsh web`, restarts DSH when asked, and offers the same start-at-logon toggle; the output it captures stays one double-click away, with no console window in the way |
-
-Both halves are installed by one package, but neither is welded to the other:
-the tray keeps working if you remove the plugin (restart then falls back to a
-hard process-tree restart), and the plugin keeps working if you never install
-the tray (restart then reports that no supervisor is present and does nothing).
+| **Power button** | DSH's official sidebar foot slot | Opens a dialog with **Shut down** / **Restart**, plus a **Start at logon** switch at its foot |
+| **Tray launcher** | Desktop shortcut and the system tray | Starts DSH, and lets you control and watch its running state |
 
 ## Screenshots
 
@@ -30,50 +30,40 @@ Settings, and takes no row of its own.
 ## Install
 
 ```bash
-# 1. the plugin (from GitHub; pin the release tag for reproducibility)
+# 1. the plugin (from GitHub; pinning the release tag keeps it reproducible).
+#    In a terminal, run:
 dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 
-# 2. the Windows tray (optional but recommended; gives you graceful restarts)
-#    from the installed package directory, run:
-#    tray\install.cmd            (double-click it, or run it in a terminal)
+# 2. the Windows tray (optional, but strongly recommended - without it the plugin
+#    is not complete). From the installed package directory, run:
+#    tray\install.cmd         (double-click it, or run it in a terminal)
 ```
 
 Then restart DSH once (`dsh web` or the existing launcher) so the new bundle is
 composed, and refresh the page.
 
-`tray\install.cmd` copies the tray into `%LOCALAPPDATA%\DSH-Launcher`, writes
-`install.json` (the single source of truth both halves read) and creates a
-**DSH Launcher** desktop shortcut. It never touches autostart — you opt in.
+`tray\install.cmd` copies the tray into `%LOCALAPPDATA%\DSH-Launcher` and creates a
+**DSH Launcher** desktop shortcut. The plugin never turns start-at-logon on by
+itself — you opt in explicitly.
+
+## Requirements
+
+- DSH host version: **0.1.7 or newer** (it uses `sidebar.footer.action`,
+  `ctx.appExit` and the `webServer` registration API).
+- Node `^22.19.0 || >=24.0.0` (DSH's own requirement).
+- The tray and start-at-logon are **Windows only**. The plugin itself is
+  platform-neutral and reports that cleanly.
 
 ## Using it
 
 - **Sidebar power button** → `Shut down` exits DSH gracefully (code 0);
-  `Restart` exits with the restart code so the tray relaunches it. Both ask for
-  a second confirmation, because the button sits within easy reach.
+  `Restart` exits with the restart code so the tray relaunches it.
 - **Start at logon** — the switch at the bottom of that dialog, and the
   checkable tray menu item, read and write the *same* registry value
-  (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` → `DSHLauncher`), so the
-  two always agree.
+  (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` → `DSHLauncher`).
 - **Tray icon** — double-click to read the captured console output; the menu has
   show/hide, start, restart, open DSH, open the log file, start at logon, and
   "shut down DSH and exit".
-
-## How restart really works
-
-The plugin never calls `process.exit` on its own:
-
-1. The UI asks the host half to restart.
-2. The host half replies `200`, then asks the launcher's **bounded shutdown
-   controller** (`ctx.appExit`) to exit — the plugin tree is disposed and the
-   port released first.
-3. The exit code (42) is the contract: the supervisor relaunches.
-
-A supervisor is only trusted when it says so: the tray sets
-`DSH_LAUNCHER_SUPERVISED=1` on the DSH process it starts. Without that marker the
-restart endpoint answers `{"ok":false,"reason":"unsupervised"}` and leaves the
-process running — click-to-lose-your-session is not a feature. This is also the
-one place where a hard restart can still happen: if you remove the plugin but
-keep the tray, the tray's own restart falls back to `taskkill /T /F`.
 
 ## HTTP surface (for scripts and other launchers)
 
@@ -123,14 +113,6 @@ Maintainers: [RELEASE.md](./RELEASE.md) carries the pre-flight checks, the
 tagging steps and the optional market listing. Those suites, plus the
 package-contents check, run in CI on every push and pull request
 (`.github/workflows/tests.yml`).
-
-## Requirements
-
-- DSH **0.1.7 or newer** (uses `sidebar.footer.action`, `ctx.appExit`, and the
-  `webServer` registration API).
-- Node `^22.19.0 || >=24.0.0` (DSH's own requirement).
-- The tray and start-at-logon are **Windows only**. The plugin itself is
-  platform-neutral and reports that cleanly.
 
 ## Design notes
 
