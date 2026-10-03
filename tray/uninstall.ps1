@@ -43,26 +43,31 @@ if ([string]::IsNullOrWhiteSpace($InstallDir)) { $InstallDir = Join-Path $env:LO
 if ([string]::IsNullOrWhiteSpace($ShortcutPath)) {
     $ShortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'DSH Launcher.lnk'
 }
+$installDirAsGiven = $InstallDir
 $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 if ($InstallDir.EndsWith('\')) { $InstallDir = $InstallDir.TrimEnd('\') }
 
 # The same folder can be spelled more than one way: as given, in long form, or as an
 # 8.3 short name - GitHub's Windows runners hand out %TEMP% as C:\Users\RUNNER~1\...,
 # while GetFullPath returns the long form. A registry value, a shortcut and a process
-# command line may each hold a different spelling, so every ownership check below
-# asks "does this mention any spelling of our folder?" instead of trusting one.
-function Get-PathVariants([string]$path) {
+# command line may each hold a different spelling, so every ownership check below asks
+# "does this mention any spelling of our folder?" instead of trusting one.
+#
+# The as-given spelling matters most: it is the one the caller (and therefore usually
+# the installer that wrote those entries) used. The short name is only a bonus, via
+# COM, which is not always available - so nothing here depends on it.
+function Get-PathVariants([string]$asGiven, [string]$normalized) {
     $variants = New-Object System.Collections.ArrayList
-    [void]$variants.Add($path)
-    try {
-        $full = [System.IO.Path]::GetFullPath($path)
-        if ($full.EndsWith('\')) { $full = $full.TrimEnd('\') }
-        if (-not $variants.Contains($full)) { [void]$variants.Add($full) }
-    } catch { }
+    foreach ($candidate in @($asGiven, $normalized)) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        $trimmed = $candidate
+        if ($trimmed.EndsWith('\')) { $trimmed = $trimmed.TrimEnd('\') }
+        if (-not $variants.Contains($trimmed)) { [void]$variants.Add($trimmed) }
+    }
     try {
         $fso = New-Object -ComObject Scripting.FileSystemObject
-        if ($fso.FolderExists($path)) {
-            $short = [string]$fso.GetFolder($path).ShortPath
+        if ($fso.FolderExists($normalized)) {
+            $short = [string]$fso.GetFolder($normalized).ShortPath
             if ($short.EndsWith('\')) { $short = $short.TrimEnd('\') }
             if (-not $variants.Contains($short)) { [void]$variants.Add($short) }
         }
@@ -74,7 +79,7 @@ function Test-MentionsPath([string]$text, $variants) {
     foreach ($variant in $variants) { if ($text -like ('*' + $variant + '*')) { return $true } }
     return $false
 }
-$pathVariants = Get-PathVariants $InstallDir
+$pathVariants = Get-PathVariants $installDirAsGiven $InstallDir
 
 Report ('install directory: ' + $InstallDir)
 if ($DryRun) { Report 'dry run: nothing will be changed' }
@@ -140,7 +145,10 @@ if ($NoStop) {
             if ($free) { [void]$mutex.ReleaseMutex() }
             $mutex.Dispose()
             if (-not $free) {
-                Warn ('a tray for port ' + $port + ' is still running but its process could not be identified; quit it from its tray menu and run this again')
+                # Reported, not warned: the mutex only proves that *some* tray is serving
+                # that port, which may be a different installation. If our own files are
+                # still locked, the directory step below is what raises the warning.
+                Report ('note: a tray for port ' + $port + ' is running, but no process running from this directory was found')
             }
         }
         Report 'tray process: not running'
