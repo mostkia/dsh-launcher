@@ -131,8 +131,7 @@ package-contents check, run in CI on every push and pull request
 
 ## Credit and licence
 
-Independent implementation. The exit-code restart convention and the general
-idea of a launcher cooperating with a power plugin were informed by
+The approach taken for some of these features was informed by
 [dsh-shutdown](https://github.com/knlght/DSH-shutdown) (MIT); no code from it is
 included here. The tray icon is derived from DSH's own front-end favicon
 (`favicon.svg`) and is used to identify the launcher.
