@@ -101,7 +101,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 
 ## 致谢与许可
 
-独立实现。退出码重启约定与"启动器配合电源插件"的思路参考了
+部分功能的实现思路参考了
 [dsh-shutdown](https://github.com/knlght/DSH-shutdown)（MIT），但**未包含其任何代码**。
 托盘图标取自 DSH 前端自带的 `favicon.svg`，用于标识本启动器。
 
