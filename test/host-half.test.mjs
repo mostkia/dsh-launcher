@@ -151,8 +151,11 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
 // A malformed install.json must be treated as "not installed", never crash.
 {
   const base = SANDBOX_HOME;
-  mkdirSync(base + '\\DSH-Launcher', { recursive: true });
-  writeFileSync(base + '\\DSH-Launcher\\install.json', '{ this is not json', 'utf8');
+  // join(), not string concatenation with a backslash: on Linux a hardcoded "\\"
+  // is a literal character in a file name, so the directory the test created and
+  // the one the plugin looks for were different and the Linux CI job failed.
+  mkdirSync(join(base, 'DSH-Launcher'), { recursive: true });
+  writeFileSync(join(base, 'DSH-Launcher', 'install.json'), '{ this is not json', 'utf8');
   process.env.LOCALAPPDATA = base;
   const res = makeRes();
   routes.get(PREFIX + '/status')(makeReq('GET'), res);
@@ -162,7 +165,7 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
   check('malformed install.json -> still 200, autostart unsupported',
     res.statusCode === 200 && parsed !== null && parsed.autostart.supported === false, JSON.stringify(parsed && parsed.autostart));
   // A well-formed marker is recognised (the registry read stays read-only).
-  writeFileSync(base + '\\DSH-Launcher\\install.json', JSON.stringify({ vbs: 'C:\\tmp\\x.vbs', wscript: 'C:\\Windows\\System32\\wscript.exe' }), 'utf8');
+  writeFileSync(join(base, 'DSH-Launcher', 'install.json'), JSON.stringify({ vbs: 'C:\\tmp\\x.vbs', wscript: 'C:\\Windows\\System32\\wscript.exe' }), 'utf8');
   const res2 = makeRes();
   routes.get(PREFIX + '/status')(makeReq('GET'), res2);
   await new Promise((r) => setTimeout(r, 600));
