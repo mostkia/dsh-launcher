@@ -78,6 +78,27 @@ if ($NoStop) {
         Warn ('could not list processes: ' + $_.Exception.Message)
     }
     if ($candidates.Count -eq 0) {
+        # Fallback for hosts where the process listing is unavailable or gives no
+        # command lines: the tray writes its own pid into its log when it starts, so
+        # use that - but only if a powershell process with that id is really there.
+        $logPath = Join-Path $InstallDir 'state\dsh-tray.log'
+        if (Test-Path -LiteralPath $logPath) {
+            try {
+                $matches = [regex]::Matches([System.IO.File]::ReadAllText($logPath, [System.Text.Encoding]::UTF8), 'tray starting \(pid (\d+)\)')
+                if ($matches.Count -gt 0) {
+                    $recorded = [int]$matches[$matches.Count - 1].Groups[1].Value
+                    $process = Get-Process -Id $recorded -ErrorAction SilentlyContinue
+                    if ($null -ne $process -and $process.ProcessName -eq 'powershell') {
+                        Report ('tray process ' + $recorded + ' found through its log')
+                        $candidates = @([pscustomobject]@{ ProcessId = $recorded; Name = 'powershell.exe' })
+                    }
+                }
+            } catch {
+                Warn ('could not read the tray log: ' + $_.Exception.Message)
+            }
+        }
+    }
+    if ($candidates.Count -eq 0) {
         Report 'tray process: not running'
     } else {
         foreach ($candidate in $candidates) {

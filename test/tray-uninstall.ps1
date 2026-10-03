@@ -18,7 +18,10 @@
 #   6. a shortcut and a value that point somewhere else are reported, never removed
 [CmdletBinding()]
 param(
-    [int]$TrayPort = 3599
+    # A port of its own: the supervision suite runs first in the same CI job and
+    # leaves a fake DSH behind for a few seconds, so sharing its port would make
+    # this suite fail on a leftover instead of on its own behaviour.
+    [int]$TrayPort = 3598
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,6 +55,17 @@ function Test-PortUp([int]$port) {
 function Wait-PortFree([int]$port, [int]$seconds) {
     for ($i = 0; $i -lt $seconds * 2; $i++) { if (-not (Test-PortUp $port)) { return $true }; Start-Sleep -Milliseconds 500 }
     return (-not (Test-PortUp $port))
+}
+
+# "Is the tray running" is asked through its single-instance mutex rather than by
+# scanning command lines: the mutex is what actually keeps a second tray out, and it
+# works on hosts where process command lines are not readable.
+function Test-TrayRunning([int]$port) {
+    $mutex = New-Object System.Threading.Mutex($false, ('Local\dsh-tray-launcher-' + $port))
+    $free = $mutex.WaitOne(0)
+    if ($free) { [void]$mutex.ReleaseMutex() }
+    $mutex.Dispose()
+    return (-not $free)
 }
 
 # Build a scratch installation that looks like the real one.
@@ -146,7 +160,7 @@ try {
     $trayUp = $false
     for ($i = 0; $i -lt 20; $i++) {
         Start-Sleep -Milliseconds 500
-        $trayUp = [bool](Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $s5.dir + '*')) -and ($_.CommandLine -match 'dsh-launcher-tray\.ps1') })
+        $trayUp = Test-TrayRunning $TrayPort
         if ($trayUp) { break }
     }
     Assert 'the scratch tray is running before the uninstall' $trayUp
@@ -155,7 +169,9 @@ try {
     Assert 'its fake DSH child is listening on the scratch port' $childUp
     $r = Invoke-Uninstaller (@('-InstallDir', $s5.dir, '-ShortcutPath', (Join-Path $s5.dir 'none.lnk'), '-RunKeyPath', $scratchKey, '-RunValueName', 'TestLauncher'))
     Assert 'uninstall with a running tray reports success' ($r.code -eq 0) ('exit=' + $r.code + ' out=' + $r.output.Trim())
-    Assert 'the tray process is gone' (-not [bool](Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $s5.dir + '*')) -and ($_.CommandLine -match 'dsh-launcher-tray\.ps1') }))
+    $trayGone = $false
+    for ($i = 0; $i -lt 20; $i++) { Start-Sleep -Milliseconds 500; if (-not (Test-TrayRunning $TrayPort)) { $trayGone = $true; break } }
+    Assert 'the tray is gone (its mutex was released)' $trayGone
     Assert 'its files could be removed (so the log handle was released)' (-not (Test-Path -LiteralPath $s5.dir))
     Assert 'the DSH it supervised is still listening' (Test-PortUp $TrayPort)
 
