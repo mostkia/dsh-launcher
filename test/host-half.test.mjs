@@ -12,7 +12,7 @@
  *
  * Run: node test/host-half.test.mjs
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -64,9 +64,38 @@ const ctx = {
   get(name) { return name === 'appExit' ? appExit : undefined; },
 };
 
+// The plugin installs and removes its own tray half at runtime, and apply() starts
+// those timers. Point both steps at scratch scripts BEFORE apply() runs: the default
+// would invoke the real tray/install.ps1, which creates a desktop shortcut.
+//
+// The documented opt-out is set for the whole harness so the background install can
+// never race the checks below; the lifecycle block turns it off for its own calls.
+const LIFECYCLE_CALLS = join(SANDBOX_HOME, 'lifecycle-calls.txt');
+const FAKE_INSTALLER = join(SANDBOX_HOME, 'fake-install.ps1');
+const FAKE_UNINSTALLER = join(SANDBOX_HOME, 'fake-uninstall.ps1');
+const INSTALLED_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+writeFileSync(
+  FAKE_INSTALLER,
+  [
+    "$dir = Join-Path $env:LOCALAPPDATA 'DSH-Launcher'",
+    'New-Item -ItemType Directory -Force -Path $dir | Out-Null',
+    // WriteAllText, not Set-Content: Windows PowerShell 5.1 writes a BOM with
+    // -Encoding UTF8, and a BOM makes the marker unparseable for JSON.parse.
+    "[System.IO.File]::WriteAllText((Join-Path $dir 'install.json'), '{\"version\":\"" + INSTALLED_VERSION + "\"}')",
+    "New-Item -ItemType File -Force -Path (Join-Path $dir 'dsh-launcher-tray.ps1') | Out-Null",
+    "New-Item -ItemType File -Force -Path (Join-Path $dir 'uninstall.ps1') | Out-Null",
+    "Add-Content -LiteralPath '" + LIFECYCLE_CALLS + "' -Value 'install'",
+    '',
+  ].join('\r\n'),
+  'utf8',
+);
+writeFileSync(FAKE_UNINSTALLER, "Add-Content -LiteralPath '" + LIFECYCLE_CALLS + "' -Value 'uninstall'\r\n", 'utf8');
+process.env.DSH_LAUNCHER_TRAY_INSTALLER = FAKE_INSTALLER;
+process.env.DSH_LAUNCHER_TRAY_UNINSTALLER = FAKE_UNINSTALLER;
+process.env.DSH_LAUNCHER_NO_TRAY_INSTALL = '1';
+
 const mod = await import(MODULE_URL);
 await mod.apply(ctx);
-
 check('exports apply', typeof mod.apply === 'function');
 check('registers 5 endpoints', routes.size === 5, [...routes.keys()].join(' '));
 check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PREFIX)));
@@ -251,6 +280,109 @@ const ON_WINDOWS = process.platform === 'win32';
   check('no exit controller -> restart answers 503, not 200',
     res2.statusCode === 503 && parsed2 !== null && parsed2.error === 'no-exit-controller', JSON.stringify(parsed2));
   delete process.env.DSH_LAUNCHER_SUPERVISED;
+}
+
+// ---------------------------------------------------------------- tray lifecycle
+// Adding the package should be enough: the plugin installs its own tray half, and
+// takes it away again when the package is removed. Both steps run here against the
+// scratch scripts set up at the top, so no real tray is installed or removed - and
+// the whole block is Windows-only, because the tray is: on Linux both steps must
+// report `windows-only` instead of pretending (the CI matrix runs this suite there).
+if (ON_WINDOWS) {
+  const { ensureTrayInstalled, checkTrayRemoval, trayState } = mod;
+  const trayDir = join(SANDBOX_HOME, 'DSH-Launcher');
+  const callLines = () => (existsSync(LIFECYCLE_CALLS) ? readFileSync(LIFECYCLE_CALLS, 'utf8').split(/\r?\n/).filter(Boolean) : []);
+  const profileDir = join(SANDBOX_HOME, 'fake-profile');
+  mkdirSync(profileDir, { recursive: true });
+  const writeProfile = (withUs) => writeFileSync(
+    join(profileDir, 'package.json'),
+    JSON.stringify({ name: 'web', dsh: { profile: { bundles: [] } }, dependencies: withUs ? { '@mostkia/dsh-launcher': 'link:somewhere' } : {} }),
+    'utf8',
+  );
+
+  // Let the install timer apply() started run its course: with the opt-out in place it
+  // must report the skip, which is what proves the timer is wired and reporting.
+  await new Promise((r) => setTimeout(r, 1700));
+  {
+    const res = makeRes();
+    routes.get(PREFIX + '/status')(makeReq('GET'), res);
+    await new Promise((r) => setTimeout(r, 60));
+    const parsed = JSON.parse(res.body);
+    check('status reports what the automatic install did',
+      parsed.tray !== undefined && parsed.tray.install !== undefined && parsed.tray.install.reason === 'disabled-by-env',
+      JSON.stringify(parsed.tray && parsed.tray.install));
+  }
+
+  delete process.env.DSH_LAUNCHER_NO_TRAY_INSTALL;
+  rmSync(trayDir, { recursive: true, force: true });
+  check('a tray that is not there does not read as installed', trayState().installed === false, JSON.stringify(trayState()));
+
+  const first = await ensureTrayInstalled();
+  check('missing tray -> installed automatically', first.action === 'installed' && first.version === INSTALLED_VERSION, JSON.stringify(first));
+  check('the installer really ran', callLines().filter((l) => l === 'install').length === 1, callLines().join(','));
+  check('and the tray now reads as up to date', trayState().upToDate === true, JSON.stringify(trayState()));
+
+  const second = await ensureTrayInstalled();
+  check('an up-to-date tray is left alone', second.action === 'skipped' && second.reason === 'already-installed', JSON.stringify(second));
+  check('so the installer did not run again', callLines().filter((l) => l === 'install').length === 1, callLines().join(','));
+
+  // A tray from an older release is updated in place. (mkdirSync first: if an earlier
+  // install failed - a sandbox that refuses to spawn PowerShell, say - these checks
+  // should report failures rather than crash the suite with ENOENT.)
+  mkdirSync(trayDir, { recursive: true });
+  writeFileSync(join(trayDir, 'install.json'), JSON.stringify({ version: '0.0.1' }), 'utf8');
+  const third = await ensureTrayInstalled();
+  check('a tray from an older release is updated', third.action === 'updated' && third.version === INSTALLED_VERSION, JSON.stringify(third));
+
+  writeFileSync(join(trayDir, 'install.json'), JSON.stringify({ version: '0.0.1' }), 'utf8');
+  process.env.DSH_LAUNCHER_NO_TRAY_INSTALL = '1';
+  const fourth = await ensureTrayInstalled();
+  delete process.env.DSH_LAUNCHER_NO_TRAY_INSTALL;
+  check('DSH_LAUNCHER_NO_TRAY_INSTALL=1 disables the automatic install',
+    fourth.action === 'skipped' && fourth.reason === 'disabled-by-env', JSON.stringify(fourth));
+
+  // A tray the user removed on purpose leaves a marker; the automatic install has to
+  // respect it, or "uninstall the tray" would only last until the next restart.
+  const optOutMarker = join(SANDBOX_HOME, 'DSH-Launcher.optout');
+  writeFileSync(optOutMarker, 'x', 'utf8');
+  const fifth = await ensureTrayInstalled();
+  check('a deliberate tray removal is remembered', fifth.action === 'skipped' && fifth.reason === 'opted-out', JSON.stringify(fifth));
+  rmSync(optOutMarker, { force: true });
+
+  // Removal detection: while the profile still lists the package, nothing happens...
+  process.env.DSH_LAUNCHER_PROFILE_DIR = profileDir;
+  writeProfile(true);
+  const idle = await checkTrayRemoval();
+  check('still listed in the profile -> no cleanup', idle.action === 'idle' && idle.reason === 'still-installed', JSON.stringify(idle));
+  check('and no uninstall was attempted', callLines().includes('uninstall') === false, callLines().join(','));
+
+  // ...and once the dependency entry is gone, the tray goes with the package.
+  writeProfile(false);
+  const removed = await checkTrayRemoval();
+  check('removed from the profile -> the tray is uninstalled', removed.action === 'tray-removed', JSON.stringify(removed));
+  check('the installed copy of the uninstaller ran', callLines().includes('uninstall'), callLines().join(','));
+  const again = await checkTrayRemoval();
+  check('the cleanup can only happen once', again.action === 'idle' && again.reason === 'already-cleaned', JSON.stringify(again));
+  delete process.env.DSH_LAUNCHER_PROFILE_DIR;
+
+  {
+    const res = makeRes();
+    routes.get(PREFIX + '/status')(makeReq('GET'), res);
+    await new Promise((r) => setTimeout(r, 60));
+    const parsed = JSON.parse(res.body);
+    check('status carries the tray state for diagnosis',
+      parsed.tray !== undefined && parsed.tray.installed === true && parsed.tray.expected === INSTALLED_VERSION,
+      JSON.stringify(parsed.tray));
+  }
+} else {
+  const skipped = await mod.ensureTrayInstalled();
+  check('off Windows the automatic install reports windows-only',
+    skipped.action === 'skipped' && skipped.reason === 'windows-only', JSON.stringify(skipped));
+  const idle = await mod.checkTrayRemoval();
+  check('off Windows the removal check reports windows-only',
+    idle.action === 'idle' && idle.reason === 'windows-only', JSON.stringify(idle));
+  const state = mod.trayState();
+  check('off Windows the tray state says unsupported', state.supported === false && state.installed === false, JSON.stringify(state));
 }
 
 const failed = results.filter((r) => !r.ok);

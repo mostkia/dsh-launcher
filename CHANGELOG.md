@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.2.0 — 2026-10-03
+
+### Changed
+
+- **Adding the package now installs the tray too, and removing the package takes it
+  away.** One command each, no separate tray step:
+  - The plugin installs its own companion on the first start after the package was
+    added (it ships the tray, so nothing is downloaded). A package manager cannot do
+    this for us - pnpm 10+ refuses to run a dependency's install script unless it is
+    allowlisted, and the DSH plugin command has no hooks - so the plugin does it, at
+    `apply()` time, and reports the outcome in the status document. Nothing needs
+    administrator rights.
+  - `dsh plugin --profile web remove @mostkia/dsh-launcher` is noticed by the still
+    running plugin: the package folder is gone and the profile no longer depends on
+    it, so the tray is uninstalled through the copy in the install directory (the
+    package's own copy left with the package).
+- **Removing the tray on purpose is remembered.** The uninstaller leaves an opt-out
+  marker next to the install folder, which the automatic install respects - otherwise
+  a user who wanted the plugin without the tray would find it reinstalled on every
+  restart. `install.cmd` clears the marker; `DSH_LAUNCHER_NO_TRAY_INSTALL=1` disables
+  the automatic install outright.
+
+### Notes
+
+- Both lifecycle steps are exercised in the host suite against scratch scripts and a
+  scratch `%LOCALAPPDATA%`, so the tests never install or remove a real tray. The
+  suite is Windows-only for those checks, and asserts the `windows-only` answers
+  elsewhere, because the CI matrix also runs it on Linux.
+- `tray\uninstall.ps1 -FromPlugin` is the plugin-driven path: it removes the tray
+  without recording an opt-out, since being removed with the package is not the user's
+  decision.
+
 ## 0.1.2 — 2026-10-03
 
 ### Fixed

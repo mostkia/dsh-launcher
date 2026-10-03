@@ -126,6 +126,9 @@ try {
     Assert 'install directory is gone' (-not (Test-Path -LiteralPath $s.dir))
     Assert 'shortcut is gone' (-not (Test-Path -LiteralPath $s.lnk))
     Assert 'registry value is gone' ($null -eq (Get-ScratchRunValue))
+    # Removing the tray by hand is a decision the plugin must not undo on its next
+    # start, so the uninstaller records it next to the install directory.
+    Assert 'the opt-out marker was written' (Test-Path -LiteralPath ($s.dir + '.optout'))
 
     # ---------------------------------------------------------------- case 3
     Write-Host '== case 3: -KeepState keeps the logs =='
@@ -207,9 +210,12 @@ try {
     Assert 'uninstall.ps1 travels with the tray' (Test-Path -LiteralPath (Join-Path $s7 'uninstall.ps1'))
     $info7 = [System.IO.File]::ReadAllText((Join-Path $s7 'install.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json
     Assert 'install.json records the uninstaller' ([bool]([string]$info7.uninstall -like '*uninstall.cmd'))
-    $out7 = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $s7 'uninstall.ps1') -InstallDir $s7 -ShortcutPath (Join-Path $s7 'none.lnk') -RunKeyPath $scratchKey -RunValueName 'TestLauncher' 2>&1 | Out-String
+    $out7 = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $s7 'uninstall.ps1') -InstallDir $s7 -ShortcutPath (Join-Path $s7 'none.lnk') -RunKeyPath $scratchKey -RunValueName 'TestLauncher' -FromPlugin 2>&1 | Out-String
     Assert 'the copied uninstaller removes its own installation' ($LASTEXITCODE -eq 0) ('exit=' + $LASTEXITCODE + ' ' + $out7.Trim())
     Assert 'nothing is left behind' (-not (Test-Path -LiteralPath $s7))
+    # -FromPlugin is the plugin-removal path: that is not the user's decision, so no
+    # opt-out marker may be left behind for a later reinstall to trip over.
+    Assert 'a plugin-driven removal does not opt the user out' (-not (Test-Path -LiteralPath ($s7 + '.optout')))
 } finally {
     try { $runKey.DeleteSubKeyTree($scratchKey, $false) } catch { }
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $work + '*')) } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch { } }

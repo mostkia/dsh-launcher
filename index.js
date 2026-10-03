@@ -26,8 +26,9 @@
  * Symbols and the scheduler lookup).
  */
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const name = 'dsh-launcher';
 export const inject = [];
@@ -46,6 +47,26 @@ const RUN_VALUE = 'DSHLauncher';
 /** Same-origin hosts accepted for the destructive endpoints (CSRF guard). */
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1', '[::1]'];
 const IS_WINDOWS = process.platform === 'win32';
+/**
+ * Set to `1` to keep the plugin from installing the tray by itself. This is the
+ * documented opt-out; the three that follow are test seams - they point the two
+ * lifecycle steps at scratch scripts so the suite never installs or removes a real
+ * tray.
+ */
+const NO_AUTO_INSTALL_ENV = 'DSH_LAUNCHER_NO_TRAY_INSTALL';
+const INSTALLER_ENV = 'DSH_LAUNCHER_TRAY_INSTALLER';
+const UNINSTALLER_ENV = 'DSH_LAUNCHER_TRAY_UNINSTALLER';
+const PROFILE_ENV = 'DSH_LAUNCHER_PROFILE_DIR';
+/** How long after startup the automatic tray install runs (it never blocks boot). */
+const TRAY_INSTALL_DELAY_MS = 1500;
+/** How often the plugin checks whether it has been removed from the profile. */
+const REMOVAL_CHECK_MS = 30000;
+/** This package's own directory: the tray ships inside it, so the install starts here. */
+const PACKAGE_DIR = dirname(fileURLToPath(import.meta.url));
+/** Folder the tray installer uses under %LOCALAPPDATA%. */
+const TRAY_DIR_NAME = 'DSH-Launcher';
+/** This package's name, as registered in the profile's dependencies. */
+const PACKAGE_NAME = '@mostkia/dsh-launcher';
 
 /**
  * Accept only same-origin callers: a browser always sends `Origin` on a POST, and
@@ -135,11 +156,210 @@ function readInstallInfo() {
  * Resolve the command that starts the installed tray, if any.
  * @returns `{ wscript, vbs }` or null.
  */
-function autostartTarget() {
-  const info = readInstallInfo();
+function autostartTarget() {  const info = readInstallInfo();
   if (info === null || typeof info.vbs !== 'string' || info.vbs === '') return null;
   const wscript = typeof info.wscript === 'string' && info.wscript !== '' ? info.wscript : 'wscript.exe';
   return { wscript, vbs: info.vbs };
+}
+
+/** Cache for packageVersion(): read once, this file never changes under us. */
+let packageVersionCache;
+/**
+ * This package's version - the same string install.ps1 records in the tray marker,
+ * which is how "the tray matches the plugin that installed it" is decided.
+ * @returns the version, or null when it cannot be read.
+ */
+function packageVersion() {
+  if (packageVersionCache !== undefined) return packageVersionCache;
+  try {
+    const pkg = JSON.parse(readFileSync(join(PACKAGE_DIR, 'package.json'), 'utf8'));
+    packageVersionCache = typeof pkg.version === 'string' ? pkg.version : null;
+  } catch {
+    packageVersionCache = null;
+  }
+  return packageVersionCache;
+}
+
+/**
+ * @returns the folder the tray installer writes to, or null without a profile.
+ */
+function trayInstallDir() {
+  const base = process.env.LOCALAPPDATA;
+  if (typeof base !== 'string' || base === '') return null;
+  return join(base, TRAY_DIR_NAME);
+}
+
+/**
+ * Marker the tray uninstaller leaves behind when a *user* removed the tray. It sits
+ * next to the install folder (so deleting the folder cannot delete the decision) and
+ * the automatic install respects it - otherwise removing the tray by hand would mean
+ * the plugin puts it back on the next start, which is exactly the kind of behaviour
+ * that makes people distrust a plugin. Running install.cmd removes the marker, so a
+ * deliberate reinstall works.
+ * @returns the marker path, or null without a profile.
+ */
+function trayOptOutPath() {
+  const base = process.env.LOCALAPPDATA;
+  if (typeof base !== 'string' || base === '') return null;
+  return join(base, TRAY_DIR_NAME + '.optout');
+}
+
+/**
+ * What the tray half looks like right now. "Installed" means the marker is readable
+ * *and* the files the plugin has to drive are there: a marker left behind after a
+ * manual cleanup must not read as a working tray.
+ * @returns `{ supported, installed, version, expected, upToDate, dir }`.
+ */
+function trayState() {
+  const dir = trayInstallDir();
+  const info = readInstallInfo();
+  const expected = packageVersion();
+  const version = info !== null && typeof info.version === 'string' ? info.version : null;
+  const filesThere = dir !== null
+    && existsSync(join(dir, 'dsh-launcher-tray.ps1'))
+    && existsSync(join(dir, 'uninstall.ps1'));
+  const installed = info !== null && filesThere;
+  return {
+    supported: IS_WINDOWS,
+    installed,
+    version,
+    expected,
+    upToDate: installed && expected !== null && version === expected,
+    dir,
+  };
+}
+
+/**
+ * Find the profile this package was installed into. A checkout has no profile entry
+ * and therefore no removal to detect, so anything that does not look like
+ * `<profile>/node_modules/@mostkia/dsh-launcher` counts as "no profile".
+ * @returns the profile directory, or null.
+ */
+function detectProfileDir() {
+  const override = process.env[PROFILE_ENV];
+  if (typeof override === 'string' && override !== '') return override;
+  const candidate = resolve(PACKAGE_DIR, '..', '..', '..');
+  try {
+    const pkg = JSON.parse(readFileSync(join(candidate, 'package.json'), 'utf8'));
+    if (pkg !== null && typeof pkg === 'object' && pkg.dsh !== undefined) return candidate;
+  } catch {
+    /* not a profile install */
+  }
+  return null;
+}
+
+/**
+ * Whether the profile still depends on this package. This - not the vanished folder -
+ * is the authoritative signal: a folder can disappear briefly while an upgrade
+ * replaces it, but the dependency entry only goes away on removal.
+ * @returns true when the package is still listed, and also when that cannot be told.
+ */
+function profileListsPackage() {
+  const dir = detectProfileDir();
+  if (dir === null) return true;
+  try {
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    return Boolean(pkg && pkg.dependencies && pkg.dependencies[PACKAGE_NAME]);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Run a PowerShell script file and report only whether it succeeded.
+ *
+ * Same reasoning as runReg: `stdio: 'ignore'` plus `windowsHide` keeps this working
+ * in confined environments, and the exit code is the entire result.
+ * @param script - absolute path of the script.
+ * @param args - extra argument vector.
+ * @param timeoutMs - how long to let it run.
+ * @returns whether the script succeeded, plus its exit code.
+ */
+function runPowerShellFile(script, args, timeoutMs) {
+  return new Promise((settle) => {
+    try {
+      execFile(
+        'powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, ...args],
+        { windowsHide: true, stdio: 'ignore', timeout: timeoutMs },
+        (error) => {
+          if (error === null || error === undefined) {
+            settle({ ok: true, code: 0 });
+            return;
+          }
+          settle({ ok: false, code: typeof error.code === 'number' ? error.code : null });
+        },
+      );
+    } catch {
+      settle({ ok: false, code: null });
+    }
+  });
+}
+
+/**
+ * Install or update the tray half, so that adding the plugin is a one-step install.
+ *
+ * The package manager cannot do this for us: pnpm 10+ refuses to run a dependency's
+ * lifecycle scripts unless it is allowlisted, and the DSH plugin command has no
+ * hooks. What is left is the honest one - the plugin installs its own companion from
+ * the copy shipped inside the package, on the first start after the package was
+ * added. Nothing here needs elevation (the tray lives entirely in the user's
+ * profile), and `DSH_LAUNCHER_NO_TRAY_INSTALL=1` turns it off.
+ * @returns what happened, for the status document and the log.
+ */
+async function ensureTrayInstalled() {
+  if (!IS_WINDOWS) return { action: 'skipped', reason: 'windows-only' };
+  if (process.env[NO_AUTO_INSTALL_ENV] === '1') return { action: 'skipped', reason: 'disabled-by-env' };
+  const optOut = trayOptOutPath();
+  if (optOut !== null && existsSync(optOut)) return { action: 'skipped', reason: 'opted-out' };
+  const before = trayState();
+  if (before.installed && before.upToDate) {
+    return { action: 'skipped', reason: 'already-installed', version: before.version };
+  }
+  const override = process.env[INSTALLER_ENV];
+  const script = typeof override === 'string' && override !== '' ? override : join(PACKAGE_DIR, 'tray', 'install.ps1');
+  if (!existsSync(script)) return { action: 'failed', reason: 'installer-missing' };
+  const result = await runPowerShellFile(script, ['-Dir', process.cwd()], 180000);
+  if (!result.ok) return { action: 'failed', reason: 'installer-failed', exitCode: result.code };
+  const after = trayState();
+  if (!after.installed) return { action: 'failed', reason: 'installer-did-not-install' };
+  return { action: before.installed ? 'updated' : 'installed', version: after.version };
+}
+
+/** Guards the removal cleanup so it can run at most once per process. */
+let removalDone = false;
+
+/**
+ * Notice that this package was removed from the profile while we were still loaded,
+ * and take the tray with it.
+ *
+ * `dsh plugin remove` deletes the package folder but the running process keeps the
+ * plugin, so this window is real - measured, not assumed: after a removal the status
+ * endpoint kept answering until DSH was restarted. Once the dependency entry is gone
+ * the tray goes through the copy in the install directory (the package's own copy
+ * left with the package). If DSH is killed before this can run, the tray's menu item
+ * and the installed uninstall.cmd are still there.
+ * @returns what happened, for the status document and the log.
+ */
+async function checkTrayRemoval() {
+  if (!IS_WINDOWS) return { action: 'idle', reason: 'windows-only' };
+  if (removalDone) return { action: 'idle', reason: 'already-cleaned' };
+  if (profileListsPackage()) return { action: 'idle', reason: 'still-installed' };
+  removalDone = true;
+  const override = process.env[UNINSTALLER_ENV];
+  const dir = trayInstallDir();
+  const installedCopy = dir !== null ? join(dir, 'uninstall.ps1') : null;
+  const script = typeof override === 'string' && override !== ''
+    ? override
+    : (installedCopy !== null && existsSync(installedCopy) ? installedCopy : join(PACKAGE_DIR, 'tray', 'uninstall.ps1'));
+  if (!existsSync(script)) return { action: 'failed', reason: 'uninstaller-missing' };
+  // -FromPlugin: we are being removed because the package went away, so the
+  // uninstaller must not leave the "the user removed the tray on purpose" marker -
+  // reinstalling the plugin should bring the tray back.
+  const result = await runPowerShellFile(script, ['-FromPlugin'], 180000);
+  return result.ok
+    ? { action: 'tray-removed' }
+    : { action: 'failed', reason: 'uninstaller-failed', exitCode: result.code };
 }
 
 /**
@@ -235,6 +455,22 @@ export async function apply(ctx) {
     // would also skip the web server's asynchronous disposal.
     const exitController = ctx.get('appExit');
     const exitApp = typeof exitController === 'function' ? exitController : null;
+    // Two lifecycle steps ride along with the web server: install the tray half when
+    // this package is added, and remove it when the package is removed. Both report
+    // into the status document so a failure is diagnosable instead of silent.
+    const trayLifecycle = { install: { action: 'pending' }, removal: { action: 'pending' } };
+    const installTimer = setTimeout(() => {
+      ensureTrayInstalled()
+        .then((result) => { trayLifecycle.install = result; })
+        .catch((error) => { trayLifecycle.install = { action: 'failed', reason: String((error && error.message) || error) }; });
+    }, TRAY_INSTALL_DELAY_MS);
+    const removalTimer = setInterval(() => {
+      checkTrayRemoval()
+        .then((result) => { trayLifecycle.removal = result; })
+        .catch((error) => { trayLifecycle.removal = { action: 'failed', reason: String((error && error.message) || error) }; });
+    }, REMOVAL_CHECK_MS);
+    if (typeof installTimer.unref === 'function') installTimer.unref();
+    if (typeof removalTimer.unref === 'function') removalTimer.unref();
     const disposers = [
       register(server, 'GET', PREFIX + '/status', async (req, res) => {
         sendJson(res, 200, {
@@ -243,6 +479,7 @@ export async function apply(ctx) {
           pid: process.pid,
           supervised: process.env[SUPERVISOR_ENV] === '1',
           autostart: await autostartState(),
+          tray: { ...trayState(), install: trayLifecycle.install, removal: trayLifecycle.removal },
         });
       }),
       register(server, 'POST', PREFIX + '/shutdown', (req, res) => {
@@ -275,6 +512,8 @@ export async function apply(ctx) {
       }),
     ];
     return () => {
+      clearTimeout(installTimer);
+      clearInterval(removalTimer);
       for (const dispose of disposers) {
         try {
           dispose();
@@ -300,3 +539,9 @@ function requestExit(exit, code) {
     /* the process stays alive; the client's verification step surfaces that */
   }
 }
+
+/**
+ * Test seams: the suite drives the two lifecycle steps directly, against scratch
+ * scripts and a scratch %LOCALAPPDATA%, instead of installing or removing real ones.
+ */
+export { checkTrayRemoval, ensureTrayInstalled, trayState };

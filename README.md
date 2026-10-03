@@ -30,32 +30,39 @@ Settings, and takes no row of its own.
 ## Install
 
 ```bash
-# 1. the plugin (from GitHub; pinning the release tag keeps it reproducible).
-#    In a terminal, run:
-dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.1
-
-# 2. the Windows tray (optional, but strongly recommended - without it the plugin
-#    is not complete). From the installed package directory, run:
-#    tray\install.cmd         (double-click it, or run it in a terminal)
+# from GitHub; pinning the release tag keeps it reproducible:
+dsh plugin --profile web add github:mostkia/dsh-launcher#v0.2.0
 ```
 
 Then restart DSH once (`dsh web` or the existing launcher) so the new bundle is
 composed, and refresh the page.
 
-`tray\install.cmd` copies the tray into `%LOCALAPPDATA%\DSH-Launcher` and creates a
-**DSH Launcher** desktop shortcut. The plugin never turns start-at-logon on by
-itself — you opt in explicitly.
+**That is the whole install.** The plugin carries the Windows tray and puts it in
+place itself on that first start: `%LOCALAPPDATA%\DSH-Launcher`, a **DSH Launcher**
+desktop shortcut, and an uninstaller next to it. A package manager will not run a
+dependency's install script for us (pnpm 10+ blocks them) and the plugin command has no
+hooks, so the plugin installs its own companion - and nothing in there needs
+administrator rights, because the tray lives entirely in your user profile. It never
+turns start-at-logon on; you opt in from the tray menu or the dialog.
 
-**To uninstall** (the mirror of the above):
+Start DSH from the **DSH Launcher** shortcut when you want it supervised, which is what
+makes the power button's *Restart* able to relaunch it.
 
-1. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`
-2. The tray: **right-click the tray icon → Uninstall tray…** (it does the work itself
-   once you confirm). You can also run `uninstall.cmd` from the install directory
-   (`%LOCALAPPDATA%\DSH-Launcher`), or `tray\uninstall.cmd` from the package. Either
-   way it stops a running tray, clears the start-at-logon entry and the desktop
-   shortcut, and deletes the install directory. It never stops DSH: DSH simply stops
-   being supervised, and you close it whenever you like. Add `-DryRun` to see what it
-   would remove without changing anything, or `-KeepState` to keep the logs in
+Changed your mind about the tray? Remove it (below) and the plugin leaves it alone from
+then on. Prefer to install it by hand? `tray\install.cmd` in the package still does
+that, and `DSH_LAUNCHER_NO_TRAY_INSTALL=1` stops the automatic install entirely.
+
+**To uninstall:**
+
+1. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`. While DSH is
+   still running, the plugin notices that its own package is gone and removes the tray
+   with it (within about half a minute); restarting DSH settles anything left over.
+2. Or take the tray off first, by hand: **right-click the tray icon → Uninstall tray…**
+   (or run `uninstall.cmd` from `%LOCALAPPDATA%\DSH-Launcher`, or `tray\uninstall.cmd`
+   from the package). It stops a running tray, clears the start-at-logon entry and the
+   desktop shortcut, and deletes the install directory. It never stops DSH: DSH simply
+   stops being supervised, and you close it whenever you like. Add `-DryRun` to see what
+   it would remove without changing anything, or `-KeepState` to keep the logs in
    `state\`.
 
 ## Requirements

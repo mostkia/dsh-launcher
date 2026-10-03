@@ -24,27 +24,31 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 ## 安装
 
 ```bash
-# 1) 插件（从 GitHub 装；建议钉住发布 tag）
-# 命令行输入运行：
-dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.1
-
-# 2) Windows 托盘（可选，但强烈建议安装，否则插件功能将不完整）
-# 在装好的包目录里运行：tray\install.cmd （双击，或在终端里执行）
+# 从 GitHub 装；建议钉住发布 tag
+dsh plugin --profile web add github:mostkia/dsh-launcher#v0.2.0
 ```
 
 然后重启一次 DSH（`dsh web` 或你现有的启动方式），再刷新页面。
 
-`tray\install.cmd` 会把托盘复制到 `%LOCALAPPDATA%\DSH-Launcher`，并在桌面创建 **DSH Launcher**
-快捷方式。插件**不会主动**开启开机自启，——那必须你显式开启。
+**装到这里就结束了。** 插件自己带着 Windows 托盘，会在这次启动时自动装好：拷到
+`%LOCALAPPDATA%\DSH-Launcher`、建桌面 **DSH Launcher** 快捷方式、并附带卸载脚本。
+包管理器不会替我们跑安装脚本（pnpm 10 以上默认拦截依赖的生命周期脚本，而 dsh 的插件命令
+也没有钩子），所以由插件自己安装自己的搭档；全程**不需要管理员权限**——托盘完全活在你的用户目录里。
+它**不会**主动打开开机自启，要你自己在托盘菜单或弹窗里开。
 
-**卸载（与安装对称）**：
+想让「重启」按钮真正生效，请用桌面 **DSH Launcher** 快捷方式启动 DSH（这样才是被托管状态）。
 
-1. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`
-2. 托盘：**右键托盘图标 →「卸载托盘…」**（确认后它自己完成卸载）；也可以在安装目录
-   `%LOCALAPPDATA%\DSH-Launcher` 里运行 `uninstall.cmd`，或用包目录下的 `tray\uninstall.cmd`。
-   它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、删除安装目录；但**不会**停 DSH ——
-   DSH 只是不再被托管，你想什么时候关就什么时候关。加 `-DryRun` 可先看它会删什么（不改动任何东西），
-   加 `-KeepState` 则保留 `state\` 里的日志。
+不想要托盘了？按下面的步骤卸掉即可，之后插件就不会再装它。想手动装也行：包里的
+`tray\install.cmd` 依旧可用；设 `DSH_LAUNCHER_NO_TRAY_INSTALL=1` 可彻底关闭自动安装。
+
+**卸载：**
+
+1. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`。DSH 还在运行时，插件会察觉自己的包
+   已被删除，并在约半分钟内把托盘一起卸掉；重启一次 DSH 则收尾更干净。
+2. 也可以先手动卸托盘：**右键托盘图标 →「卸载托盘…」**（或运行 `%LOCALAPPDATA%\DSH-Launcher\uninstall.cmd`，
+   或用包里的 `tray\uninstall.cmd`）。它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、
+   删除安装目录，但**不会**停 DSH —— DSH 只是不再被托管，你想什么时候关就什么时候关。
+   加 `-DryRun` 可先看它会删什么（不改动任何东西），加 `-KeepState` 则保留 `state\` 里的日志。
 
 ## 环境要求
 

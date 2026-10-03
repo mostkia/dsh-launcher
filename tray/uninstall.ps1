@@ -19,6 +19,8 @@
 #   uninstall.ps1 -KeepState          keep state\ (tray and console logs)
 #   uninstall.ps1 -NoStop             never stop a running tray process
 #   uninstall.ps1 -DryRun             report what would happen, change nothing
+#   uninstall.ps1 -FromPlugin         the plugin is being removed, not the user's
+#                                     decision: do not mark the tray as opted out
 #
 # -InstallDir / -ShortcutPath / -RunKeyPath / -RunValueName exist so the test suite
 # can point the whole thing at scratch locations.
@@ -30,7 +32,8 @@ param(
     [string]$RunValueName = 'DSHLauncher',
     [switch]$KeepState,
     [switch]$NoStop,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$FromPlugin
 )
 
 $ErrorActionPreference = 'Stop'
@@ -243,9 +246,30 @@ if (-not (Test-Path -LiteralPath $InstallDir)) {
     }
 }
 
-# ------------------------------------------------------------------- 5. summary
+# ------------------------------------------------- 5. remember the user's decision
+# A user who removes the tray should not find it reinstalled by the plugin on the next
+# start - that is the difference between a companion and something that keeps coming
+# back. The marker lives *next to* the install folder, so deleting the folder cannot
+# delete the decision, and install.ps1 clears it, so a deliberate reinstall works.
+# -FromPlugin means the package was removed, which is not this decision at all.
+if (-not $FromPlugin) {
+    $marker = Join-Path ([System.IO.Path]::GetDirectoryName($InstallDir)) ([System.IO.Path]::GetFileName($InstallDir) + '.optout')
+    if ($DryRun) {
+        Report ('would mark the tray as removed on purpose: ' + $marker)
+    } else {
+        try {
+            [System.IO.File]::WriteAllText($marker, ((Get-Date).ToString('o') + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+            Report ('marked the tray as removed on purpose: ' + $marker)
+        } catch {
+            Warn ('could not write the opt-out marker: ' + $_.Exception.Message)
+        }
+    }
+}
+
+# ------------------------------------------------------------------- 6. summary
 Report 'the DSH that the tray supervised is still running: stop it with the power button or by closing it'
 Report 'to remove the plugin itself: dsh plugin --profile web remove @mostkia/dsh-launcher'
+Report 'to install the tray again: tray\install.cmd from the package (clears the opt-out marker)'
 if ($script:Warnings.Count -gt 0) {
     Report ('finished with ' + $script:Warnings.Count + ' warning(s)')
     exit 1
