@@ -10,7 +10,7 @@ start it, restart it and show its console output.
 | Part | Where it lives | What it does |
 |---|---|---|
 | **Power button** | DSH sidebar, in the official `sidebar.footer.action` seat right beside Settings | Opens a dialog with **Shut down** and **Restart** (each behind a second confirmation) and a **Start at logon** switch |
-| **Tray launcher** | `%LOCALAPPDATA%\DSH-Launcher`, started from a desktop shortcut | Starts `dsh web` with no console window, keeps the log window one double-click away, restarts DSH when asked, and offers the same start-at-logon toggle |
+| **Tray launcher** | `%LOCALAPPDATA%\DSH-Launcher`, started from a desktop shortcut | Starts `dsh web`, restarts DSH when asked, and offers the same start-at-logon toggle; the output it captures stays one double-click away, with no console window in the way |
 
 Both halves are installed by one package, but neither is welded to the other:
 the tray keeps working if you remove the plugin (restart then falls back to a
@@ -19,13 +19,13 @@ the tray (restart then reports that no supervisor is present and does nothing).
 
 ## Screenshots
 
-| Power dialog, light | Power dialog, dark | Tray window |
+| Power dialog, light | Power dialog, dark | Sidebar action |
 |:--:|:--:|:--:|
-| ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) | ![the tray's captured console window](docs/screenshots/tray-window.png) |
+| ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) | ![the power action beside Settings in the sidebar](docs/screenshots/sidebar-power.png) |
 
 The dialog follows the host theme because every colour, radius and shadow comes
-from theme tokens; the tray window shows the captured output with both UTF-8
-(Node) and OEM-encoded (PowerShell) Chinese rendered correctly.
+from theme tokens. The action itself uses the shell's own sidebar foot seat, beside
+Settings, and takes no row of its own.
 
 ## Install
 

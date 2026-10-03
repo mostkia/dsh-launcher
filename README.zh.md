@@ -9,18 +9,18 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 | 部件 | 位置 | 作用 |
 |---|---|---|
 | **电源按钮** | DSH 侧边栏官方 `sidebar.footer.action` 槽位（设置按钮旁边那一列） | 点击弹对话框：**关机** / **重启**（各自再确认一次），底部还有 **开机自启动** 滑动开关 |
-| **托盘启动器** | `%LOCALAPPDATA%\DSH-Launcher`，由桌面快捷方式启动 | 无窗口启动 `dsh web`，双击托盘图标即可看它的控制台输出，可重启 DSH，菜单里也能开关开机自启 |
+| **托盘启动器** | `%LOCALAPPDATA%\DSH-Launcher`，由桌面快捷方式启动 | 无窗口启动 `dsh web`、按需重启 DSH、菜单里开关开机自启；它抓取的输出随时双击可看，全程没有命令行窗口挡在前面 |
 
 两半由**一个包**装出，但**不熔合**：卸掉插件，托盘照旧能用（重启降级为硬杀进程树）；没装托盘，插件也照旧能用（点"重启"会明确告诉你没有监督器，并且**不会**动你的进程）。
 
 ## 截图
 
-| 电源弹窗（浅色） | 电源弹窗（深色） | 托盘窗口 |
+| 电源弹窗（浅色） | 电源弹窗（深色） | 侧边栏按钮 |
 |:--:|:--:|:--:|
-| ![浅色主题下的电源弹窗](docs/screenshots/power-dialog-light.png) | ![深色主题下的电源弹窗](docs/screenshots/power-dialog-dark.png) | ![托盘抓取的控制台窗口](docs/screenshots/tray-window.png) |
+| ![浅色主题下的电源弹窗](docs/screenshots/power-dialog-light.png) | ![深色主题下的电源弹窗](docs/screenshots/power-dialog-dark.png) | ![侧边栏里紧邻“设置”的电源按钮](docs/screenshots/sidebar-power.png) |
 
-弹窗的颜色、圆角、阴影全部来自主题 token，所以跟随宿主明暗主题；托盘窗口里
-Node 的 UTF-8 与 PowerShell 的 OEM 编码中文都能正确显示。
+弹窗的颜色、圆角、阴影全部来自主题 token，所以跟随宿主明暗主题；电源按钮用的是宿主侧边栏脚部
+自己的槽位，紧邻「设置」，不额外占一行。
 
 ## 安装
 
