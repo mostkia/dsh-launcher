@@ -2,8 +2,9 @@
 
 Maintainer notes; this file is not part of the published package.
 
-`package.json` carries the development version `0.0.1`; the first public release
-is `v0.1.0`. Run everything below from the repository root.
+`package.json` carries the version being prepared: it read `0.0.1` while the plugin
+was developed locally, and `0.1.0` is the first public release. Run everything below
+from the repository root.
 
 ## 1. Pre-flight (all of these must pass)
 
@@ -49,7 +50,7 @@ extracted, no difference.
 ## 2. Cut the release
 
 ```bash
-# package.json -> "version": "0.1.0"
+# package.json -> the version being released (bump it for each release)
 git commit -am "release: 0.1.0"
 git tag -a v0.1.0 -m "v0.1.0"
 ```

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — unreleased (development builds report 0.0.1)
+## 0.1.0 — 2026-10-03
 
 First public release.
 
