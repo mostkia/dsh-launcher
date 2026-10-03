@@ -30,6 +30,22 @@ git grep -nE 'D:\\|C:\\Users|@example\.com' -- .   # must print nothing
 git grep -nE 'LOCALAPPDATA|USERPROFILE|SystemRoot' -- .   # env-based only, expected
 ```
 
+Finally prove a fresh checkout is self-sufficient - everything the plugin needs
+must be tracked, so run the suites from an export of HEAD rather than from the
+working tree:
+
+```bash
+git archive --format=zip -o repo.zip HEAD
+# extract repo.zip into an empty directory, then there:
+node test/host-half.test.mjs && node test/client-half.test.mjs
+# and, with the pack JSON, node test/pack-contents.test.mjs pack.json
+```
+
+`git archive` is used instead of `git clone` because cloning a local path inside a
+confined shell fails: git spawns a helper that needs a named pipe (Win32 error 5).
+The export has the same contents - verified 2026-10-03: 30 tracked files, 30
+extracted, no difference.
+
 ## 2. Cut the release
 
 ```bash
