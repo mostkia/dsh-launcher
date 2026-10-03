@@ -24,6 +24,35 @@ First public release.
 - Three offline test suites (host 17 checks, client 14, tray 9) and
   [`RELEASE.md`](./RELEASE.md).
 
+### Fixed before the first release
+
+An adversarial review of the repository (2026-10-03) found these; all are fixed
+and covered by tests.
+
+- **CSRF guard:** an `Origin` whose host merely matched the request's `Host` was
+  accepted, which is a DNS-rebinding hole - a page served from a name that
+  resolves to 127.0.0.1 could reach every destructive endpoint. Only loopback
+  origins are accepted now, and the README states that precisely.
+- **No false success:** shutdown and restart answered `200` and only then asked the
+  host to exit, so a missing exit controller left the process running while the
+  dialog said "shut down". The controller is resolved before the reply, a missing
+  one answers `503`, and the dialog waits for the service to stop answering before
+  it reports success.
+- **Tray:** a restart no longer starts a child blindly. If the port is still in use
+  after exit code 42, the tray kills the tree, waits again, and otherwise reports
+  that it did not restart - instead of silently losing control while the old DSH
+  keeps serving.
+- **Tray:** `Test-Supervised` carried a fallback that could never be true (a process
+  fetched by id has a default `StartInfo`). It is gone, and the log now says the
+  status endpoint did not answer; the forced-restart balloon and window text state
+  that running work is interrupted.
+- **Autostart:** disabling an entry that was not registered reported failure (since
+  `reg delete` fails on a missing value), and a failed delete reported success.
+  Both report what happened now, and `runReg` no longer flattens a spawn failure
+  into exit code 0.
+- **Client:** Escape and a backdrop click no longer dismiss the dialog while an
+  action is running, so its outcome cannot be hidden by accident.
+
 ### Notes
 
 - No coexistence shims on purpose: the plugin claims only its own namespace, so

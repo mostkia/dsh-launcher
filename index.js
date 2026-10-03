@@ -48,8 +48,17 @@ const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1', '[::1]'];
 const IS_WINDOWS = process.platform === 'win32';
 
 /**
- * Accept only same-origin callers. A browser always sends Origin on a POST, so
- * an external page is rejected; requests without Origin (scripts, curl) pass.
+ * Accept only same-origin callers: a browser always sends `Origin` on a POST, and
+ * only a page served from this machine's loopback address may change state.
+ * Requests without Origin (scripts, curl) pass - the standard CSRF reasoning, and
+ * what the README promises.
+ *
+ * An earlier version also accepted an Origin whose host equalled the request's
+ * Host header. That is not same-origin. With DNS rebinding the attacking page is
+ * served from a name that resolves to 127.0.0.1, so its Origin and the Host header
+ * agree, and every destructive endpoint became reachable from that page. The
+ * review that found it also showed the "same host" branch accepting
+ * `Origin: http://evil.example` with `Host: evil.example`.
  * @param req - the incoming request.
  * @returns whether the request may perform a state change.
  */
@@ -62,9 +71,7 @@ function isTrustedOrigin(req) {
   } catch {
     return false;
   }
-  if (LOOPBACK_HOSTS.includes(parsed.hostname)) return true;
-  const host = req.headers && req.headers.host;
-  return typeof host === 'string' && host !== '' && parsed.host === host;
+  return LOOPBACK_HOSTS.includes(parsed.hostname);
 }
 
 /**
@@ -94,11 +101,17 @@ function runReg(args) {
   return new Promise((resolve) => {
     try {
       execFile('reg.exe', args, { windowsHide: true, stdio: 'ignore' }, (error) => {
-        const code = error !== null && error !== undefined && typeof error.code === 'number' ? error.code : 0;
-        resolve({ ok: error === null || error === undefined, code });
+        if (error === null || error === undefined) {
+          resolve({ ok: true, code: 0 });
+          return;
+        }
+        // `error.code` is a string for spawn failures (EPERM) and a number for a
+        // non-zero exit. Never flatten "could not run at all" into exit code 0:
+        // callers decide on `ok`, but the code must stay truthful.
+        resolve({ ok: false, code: typeof error.code === 'number' ? error.code : null });
       });
     } catch {
-      resolve({ ok: false, code: -1 });
+      resolve({ ok: false, code: null });
     }
   });
 }
@@ -156,7 +169,12 @@ async function setAutostart(enabled) {
   const target = autostartTarget();
   if (target === null) return { ok: false, error: 'tray-not-installed' };
   if (!enabled) {
-    await runReg(['delete', RUN_KEY, '/v', RUN_VALUE, '/f']);
+    // `reg delete` fails when the value is already absent; that is the desired
+    // end state, so ask first instead of reporting a false failure.
+    const current = await runReg(['query', RUN_KEY, '/v', RUN_VALUE]);
+    if (!current.ok) return { ok: true, enabled: false, reason: 'not-registered' };
+    const removed = await runReg(['delete', RUN_KEY, '/v', RUN_VALUE, '/f']);
+    if (!removed.ok) return { ok: false, error: 'registry-delete-failed', exitCode: removed.code };
     return { ok: true, enabled: false };
   }
   const command = '"' + target.wscript + '" "' + target.vbs + '"';
@@ -189,6 +207,9 @@ function register(webServer, method, path, handler) {
       Promise.resolve()
         .then(() => handler(req, res))
         .catch((error) => {
+          // The handler may already have answered and failed afterwards; writing
+          // again would throw inside this catch and leave an unhandled rejection.
+          if (res.writableEnded === true) return;
           sendJson(res, 500, {
             ok: false,
             error: 'handler-failed',
@@ -207,6 +228,13 @@ function register(webServer, method, path, handler) {
 export async function apply(ctx) {
   ctx.inject(['webServer'], (webCtx) => {
     const server = webCtx.webServer;
+    // Resolve the host's bounded shutdown controller once, before any request can
+    // claim success. "Reported shutdown, process still running" is exactly the
+    // false success this plugin must never produce, so a missing controller is
+    // answered honestly rather than papered over with a raw process.exit, which
+    // would also skip the web server's asynchronous disposal.
+    const exitController = ctx.get('appExit');
+    const exitApp = typeof exitController === 'function' ? exitController : null;
     const disposers = [
       register(server, 'GET', PREFIX + '/status', async (req, res) => {
         sendJson(res, 200, {
@@ -218,16 +246,24 @@ export async function apply(ctx) {
         });
       }),
       register(server, 'POST', PREFIX + '/shutdown', (req, res) => {
+        if (exitApp === null) {
+          sendJson(res, 503, { ok: false, action: 'shutdown', error: 'no-exit-controller' });
+          return;
+        }
         sendJson(res, 200, { ok: true, action: 'shutdown' });
-        setTimeout(() => exitApp(ctx, 0), RESPONSE_GRACE_MS);
+        setTimeout(() => requestExit(exitApp, 0), RESPONSE_GRACE_MS);
       }),
       register(server, 'POST', PREFIX + '/restart', (req, res) => {
         if (process.env[SUPERVISOR_ENV] !== '1') {
           sendJson(res, 200, { ok: false, action: 'restart', reason: 'unsupervised' });
           return;
         }
+        if (exitApp === null) {
+          sendJson(res, 503, { ok: false, action: 'restart', error: 'no-exit-controller' });
+          return;
+        }
         sendJson(res, 200, { ok: true, action: 'restart' });
-        setTimeout(() => exitApp(ctx, RESTART_EXIT_CODE), RESPONSE_GRACE_MS);
+        setTimeout(() => requestExit(exitApp, RESTART_EXIT_CODE), RESPONSE_GRACE_MS);
       }),
       register(server, 'POST', PREFIX + '/autostart/enable', async (req, res) => {
         const result = await setAutostart(true);
@@ -251,13 +287,16 @@ export async function apply(ctx) {
 }
 
 /**
- * Request a bounded, graceful process exit through the launcher's controller,
- * falling back to a plain exit only when the host provided no controller.
- * @param ctx - the plugin context.
+ * Ask the host to exit. A controller failure can no longer be reported (the reply
+ * is already on the wire) and must not escape: an exception thrown from a timer
+ * callback has no catcher. The client therefore verifies the outcome itself.
+ * @param exit - the host's exit controller.
  * @param code - the process exit code.
  */
-function exitApp(ctx, code) {
-  const exit = ctx.get('appExit');
-  if (typeof exit === 'function') exit(code);
-  else process.exit(code);
+function requestExit(exit, code) {
+  try {
+    exit(code);
+  } catch {
+    /* the process stays alive; the client's verification step surfaces that */
+  }
 }

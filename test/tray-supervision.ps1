@@ -90,10 +90,18 @@ function Run-Case([string]$mode) {
         Assert 'the tray logged the endpoint restart' ($trayLog -match 'restart requested through /_dsh-launcher/restart')
         Assert 'exit code 42 relaunched the child' ($stdout -match 'exit code 42 -> relaunching')
         Assert 'the child was started twice' ($calls.Count -eq 2)
-    } else {
+    } elseif ($mode -eq 'unsupervised') {
         Assert 'tray refused the endpoint and forced' ($stdout -match 'self-test restart -> forced')
         Assert 'the restart endpoint was NOT called' (-not ($requests -match 'POST /_dsh-launcher/restart'))
-        Assert 'the tray logged why it refused' ($trayLog -match 'child not supervised; forcing a restart')
+        Assert 'the tray logged why it refused' ($trayLog -match 'supervision not confirmed; forcing a restart')
+        Assert 'the child was replaced by a new one' ($calls.Count -eq 2)
+    } else {
+        # 'foreign': something is listening on the port but does not serve the
+        # plugin's status route. Nothing can confirm supervision, so the tray must
+        # force the restart and say so, without pretending the plugin agreed.
+        Assert 'tray forced the restart' ($stdout -match 'self-test restart -> forced')
+        Assert 'the tray logged that the endpoint did not answer' ($trayLog -match 'did not answer; supervision cannot be confirmed')
+        Assert 'the restart endpoint was NOT called' (-not ($requests -match 'POST /_dsh-launcher/restart'))
         Assert 'the child was replaced by a new one' ($calls.Count -eq 2)
     }
 }
@@ -103,6 +111,7 @@ try {
     Write-Host ('port : ' + $Port + '  work: ' + $work)
     Run-Case 'supervised'
     Run-Case 'unsupervised'
+    Run-Case 'foreign'
 } finally {
     if ($script:Failures -eq 0) {
         Write-Host 'TRAY SUPERVISION TEST PASS'

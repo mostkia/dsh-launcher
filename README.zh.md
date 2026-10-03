@@ -60,7 +60,10 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 
 ## HTTP 接口（给脚本/其它启动器用）
 
-所有端点仅限同源（带外部站点 `Origin` 的请求一律 `403`），且都在本插件自己的命名空间下：
+所有端点会拒绝任何**不是本机回环地址**的 `Origin`（一律 `403`），且都在本插件自己的命名空间下。
+不带 `Origin` 的请求（脚本、`curl`）按设计放行：浏览器在 POST 时一定会带 `Origin`，
+所以"没有这个头"才是 CSRF 守卫该忽略的情形；而**带着 `Origin` 时绝不能因为它的 host 与请求的
+`Host` 相同就信任**——早期版本正是这么写的，那是一个 DNS 重绑定漏洞（评审实测发现）。
 
 | 方法 | 路径 | 含义 |
 |---|---|---|
@@ -75,7 +78,7 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 两半都带自测，不需要真实 dsh 会话：
 
 ```bash
-# 宿主半部：端点、守卫、退出码、自启状态（17 项）
+# 宿主半部：端点、守卫、退出码、自启状态（23 项）
 node test/host-half.test.mjs
 
 # 客户端半部：槽位注册与中英文案完整性（无需浏览器）

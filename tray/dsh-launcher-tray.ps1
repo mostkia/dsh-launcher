@@ -361,18 +361,22 @@ function Get-DshStatus {
     } catch { return $null }
 }
 
-# A restart only happens when the plugin sees DSH_LAUNCHER_SUPERVISED=1. We always
-# set it; this probe keeps a foreign/stale process from turning a click into a no-op.
+# A restart through the plugin only works when the plugin agrees it is supervised
+# (it sees DSH_LAUNCHER_SUPERVISED=1, which this tray sets on the child). When the
+# status endpoint does not answer - plugin not installed, failed to load, removed
+# from the profile, or the route is taken by another plugin - there is nothing to
+# ask, so the tray forces the restart. That does interrupt running sessions, which
+# is why the forced path logs it and shows a balloon instead of pretending the
+# restart was graceful.
+#
+# An earlier version tried to read the marker back out of the child's
+# Process.StartInfo. That can never work: fetching a process by id yields a fresh
+# Process whose StartInfo is a default object, so the lookup always came up empty.
+# Found by the 2026-10-03 adversarial review.
 function Test-Supervised {
     $st = Get-DshStatus
     if ($null -eq $st) {
-        # Older tray-child process tree: fall back to reading the marker straight
-        # out of the process environment block of our own child.
-        try {
-            $p = Get-Process -Id $script:Sup.ProcId -ErrorAction Stop
-            $m = $p.StartInfo.EnvironmentVariables['DSH_LAUNCHER_SUPERVISED']
-            if ($m -eq '1') { return $true }
-        } catch { }
+        Write-TrayLog ('status endpoint (' + $script:StatusEndpoint + ') did not answer; supervision cannot be confirmed')
         return $false
     }
     $names = $st.PSObject.Properties.Name
@@ -520,7 +524,7 @@ function Kill-DshTree {
 function Restart-Dsh {
     if ($script:Sup.Running -and (Test-PortUp $Port)) {
         if (-not (Test-Supervised)) {
-            Write-TrayLog ('restart refused by endpoint (' + $script:RestartEndpoint + '): child not supervised; forcing a restart')
+            Write-TrayLog ('restart refused by endpoint (' + $script:RestartEndpoint + '): supervision not confirmed; forcing a restart')
         } elseif (Invoke-DshEndpoint $script:RestartEndpoint) {
             Write-TrayLog ('restart requested through ' + $script:RestartEndpoint + ' (exit code 42 expected)')
             return 'plugin'
@@ -602,7 +606,7 @@ if ($Headless) {
     Write-Host ('[dsh-tray] child exited with code {0}' -f $code)
     $script:Sup.CloseLog()
     if ($script:Sup.Running) { Kill-DshTree }
-    if ($code -eq 0) { exit 0 } else { exit 1 }
+    if ($code -eq 0 -or $code -eq $script:RestartExitCode) { exit 0 } else { exit 1 }
 }
 
 # ---------------------------------------------------------------- UI
@@ -729,9 +733,24 @@ function Update-Ui {
                 Write-TrayLog ('child exited with code {0}' -f $code)
                 if ($script:ExitWhenChildEnds) { Quit-Tray; return }
                 if ($code -eq $script:RestartExitCode) {
-                    # Exit code 42 is the plugin's "restart me" signal.
+                    # Exit code 42 is the plugin's "restart me" signal. The port must
+                    # really be free before a new child starts: starting one anyway
+                    # leaves it unable to bind while the old listener keeps serving,
+                    # and the tray would then believe DSH is gone while it is not.
                     $tb.AppendText((("`r`n" + (T 'log.relaunch') + "`r`n") -f (Get-Date -Format 'HH:mm:ss')))
-                    Write-TrayLog ('restart requested (42); port free=' + (Wait-PortFree $Port 10))
+                    $free = Wait-PortFree $Port 10
+                    if (-not $free) {
+                        Write-TrayLog ('exit code 42 but port {0} is still in use; killing the tree and waiting again' -f $Port)
+                        if ($script:Sup.Running) { Kill-DshTree }
+                        $free = Wait-PortFree $Port 10
+                    }
+                    Write-TrayLog ('restart requested (42); port free=' + $free)
+                    if (-not $free) {
+                        Write-TrayLog ('port {0} is still busy; not relaunching' -f $Port)
+                        $ni.ShowBalloonTip(5000, (T 'balloon.title'), ((T 'balloon.portbusy') -f $Port), 'Error')
+                        Update-Status
+                        return
+                    }
                     if (-not (Start-Dsh)) {
                         $ni.ShowBalloonTip(5000, (T 'balloon.title'), (T 'balloon.startfail'), 'Error')
                     }

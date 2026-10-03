@@ -52,6 +52,7 @@ window.__ModuleLoader__.load({
       'busy.shutdown': '正在关闭 DSH 服务…',
       'busy.restart': '正在重启 DSH 服务…',
       'done.shutdown': '已关闭。本页可以安全关闭。',
+      'done.shutdown.stillrunning': '服务仍在响应，可能没有真正关闭，请手动检查。',
       'done.restart': '已重启，正在等待服务恢复…',
       'done.restart.ok': '服务已恢复，正在刷新页面…',
       'done.restart.timeout': '服务未在预期时间内恢复，请手动刷新页面。',
@@ -85,6 +86,7 @@ window.__ModuleLoader__.load({
       'busy.shutdown': 'Shutting DSH down…',
       'busy.restart': 'Restarting DSH…',
       'done.shutdown': 'Shut down. This page can be closed.',
+      'done.shutdown.stillrunning': 'The service is still answering, so it may not have shut down. Check it manually.',
       'done.restart': 'Restarted, waiting for the service…',
       'done.restart.ok': 'Service is back, reloading…',
       'done.restart.timeout': 'The service did not come back in time; reload this page manually.',
@@ -194,6 +196,25 @@ window.__ModuleLoader__.load({
       return false;
     }
 
+    /**
+     * Resolve true once the service stops answering, or false at the deadline.
+     * The host half replies before it asks for an exit, so "shut down" is only
+     * true once nothing answers any more; without this check a failed exit would
+     * be reported as success.
+     */
+    async function waitForServiceGone(deadline) {
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        try {
+          await fetch(PREFIX + '/status', { headers: { accept: 'application/json' } });
+          /* something answered - keep waiting */
+        } catch {
+          return true;
+        }
+      }
+      return false;
+    }
+
     /** The sidebar action: one icon button that opens the power dialog. */
     function PowerAction(props) {
       const wide = props.wide === true;
@@ -225,14 +246,18 @@ window.__ModuleLoader__.load({
         };
       }, [open, view]);
 
+      // Esc and a backdrop click dismiss the dialog only while it is still a plain
+      // choice; once an action is running, hiding it would hide its outcome.
+      const dismissable = view === 'main' || view === 'confirm-shutdown' || view === 'confirm-restart';
+
       React.useEffect(() => {
-        if (!open) return undefined;
+        if (!open || !dismissable) return undefined;
         const onKeyDown = (event) => {
           if (event.key === 'Escape') setOpen(false);
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [open]);
+      }, [open, dismissable]);
 
       const close = () => {
         setOpen(false);
@@ -285,6 +310,8 @@ window.__ModuleLoader__.load({
         }
         if (action === 'shutdown') {
           setView('done-shutdown');
+          const gone = await waitForServiceGone(Date.now() + 8000);
+          if (!gone) setNote(t('done.shutdown.stillrunning'));
           return;
         }
         setView('done-restart');
@@ -423,7 +450,7 @@ window.__ModuleLoader__.load({
         {
           className: 'dsl-overlay',
           onMouseDown: (event) => {
-            if (event.target === event.currentTarget) close();
+            if (event.target === event.currentTarget && dismissable) close();
           },
         },
         card,

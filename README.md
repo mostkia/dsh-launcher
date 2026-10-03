@@ -77,8 +77,12 @@ keep the tray, the tray's own restart falls back to `taskkill /T /F`.
 
 ## HTTP surface (for scripts and other launchers)
 
-All endpoints are same-origin only (an `Origin` header from another site is
-rejected with `403`) and live under the plugin's own namespace:
+All endpoints reject any `Origin` that is not this machine's loopback address
+(`403`) and live under the plugin's own namespace. A request without an `Origin`
+header (a script, `curl`) is allowed by design: a browser always sends one on a
+POST, so an absent header is what a CSRF guard should ignore — while a present one
+must never be trusted just because its host matches the request's `Host`, which is
+exactly the DNS-rebinding hole an earlier version had.
 
 | Method | Path | Meaning |
 |---|---|---|
@@ -93,7 +97,7 @@ rejected with `403`) and live under the plugin's own namespace:
 Both halves ship with a test that needs no real DSH session:
 
 ```bash
-# host half: endpoints, guards, exit codes, autostart states (17 checks)
+# host half: endpoints, guards, exit codes, autostart states (23 checks)
 node test/host-half.test.mjs
 
 # client half: slot registration and locale completeness, no browser needed
@@ -105,12 +109,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 
 The tray test runs `test/fake-dsh.mjs` (a tiny HTTP server that speaks the
 plugin's endpoints) as the supervised child on a scratch port, so a real DSH is
-never started, killed or restarted. It pins the decision that matters: with a
-supervised child the tray asks the plugin and waits for the restart code, and
-with an unsupervised one it refuses to call the endpoint (which would answer
-`ok:false`) and forces the restart itself. Inside a confined shell `taskkill` is
-denied, so the kill step of the forced path cannot be observed there; the runner
-notes the limitation and the fake child exits on its own instead.
+never started, killed or restarted. It pins the decisions that matter: with a
+supervised child the tray asks the plugin and waits for the restart code; with an
+unsupervised one it refuses to call the endpoint (which would answer `ok:false`)
+and forces the restart itself; and when the port is held by something that does
+not speak the plugin's status route — the plugin failed to load, or another plugin
+owns the path — it says so and forces the restart instead of claiming the plugin
+agreed. Inside a confined shell `taskkill` is denied, so the kill step of the
+forced path cannot be observed there; the runner notes the limitation and the fake
+child exits on its own instead.
 
 Maintainers: [RELEASE.md](./RELEASE.md) carries the pre-flight checks, the
 tagging steps and the optional market listing. Those suites, plus the

@@ -26,6 +26,14 @@ const log = (line) => appendFileSync(join(here, 'requests.log'), line + '\r\n');
 
 const server = createServer((req, res) => {
   log(`${req.method} ${req.url} (mode=${mode})`);
+  if (mode === 'foreign') {
+    // A listener that is not our plugin (the route belongs to another plugin, or
+    // the plugin failed to load): the tray must fall back to a forced restart and
+    // must never claim the plugin confirmed anything.
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end('{}');
+    return;
+  }
   if (req.method === 'GET' && req.url === '/_dsh-launcher/status') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(

@@ -171,6 +171,71 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
   check('valid install.json -> status body is the status document (raw: ' + res2.body + ')',
     parsed2 !== null && parsed2.autostart !== undefined && parsed2.autostart.supported === true && parsed2.autostart.target === 'C:\\tmp\\x.vbs',
     JSON.stringify(parsed2));
+
+  // Disabling when nothing is registered must report success *and* not write: the
+  // value is genuinely absent on this machine, so `reg delete` would fail and the
+  // old code reported that as a failure (and would have been a false one).
+  const res3 = makeRes();
+  routes.get(PREFIX + '/autostart/disable')(makeReq('POST', 'http://127.0.0.1:3080'), res3);
+  await new Promise((r) => setTimeout(r, 600));
+  let parsed3 = null;
+  try { parsed3 = JSON.parse(res3.body); } catch { parsed3 = null; }
+  check('autostart/disable while absent -> 200 ok:true',
+    res3.statusCode === 200 && parsed3 !== null && parsed3.ok === true && parsed3.enabled === false, JSON.stringify(parsed3));
+}
+
+// A rebinding-shaped Origin (the page's host resolves to the loopback address) must
+// not be accepted just because it matches the Host header: that was the hole the
+// 2026-10-03 review found.
+{
+  const res = makeRes();
+  routes.get(PREFIX + '/shutdown')(makeReq('POST', 'http://evil.example', 'evil.example'), res);
+  check('rebinding origin (origin host == Host) -> 403', res.statusCode === 403, 'status=' + res.statusCode + ' body=' + res.body);
+  const res2 = makeRes();
+  routes.get(PREFIX + '/shutdown')(makeReq('POST', 'https://evil.example:3080', 'evil.example:3080'), res2);
+  check('rebinding origin with port -> 403', res2.statusCode === 403, 'status=' + res2.statusCode);
+  const res3 = makeRes();
+  routes.get(PREFIX + '/shutdown')(makeReq('POST', 'null'), res3);
+  check('opaque origin ("null") -> 403', res3.statusCode === 403, 'status=' + res3.statusCode);
+}
+
+// Without the host's exit controller the endpoints must refuse instead of
+// answering 200 and leaving the process running ("reported shutdown" was the
+// false-success shape the review flagged).
+{
+  const plainRoutes = new Map();
+  const noExitCtx = {
+    inject(names, callback) {
+      return callback({
+        webServer: {
+          register(spec) {
+            plainRoutes.set(spec.path, spec.handler);
+            return () => plainRoutes.delete(spec.path);
+          },
+        },
+      });
+    },
+    get() {
+      return undefined;
+    },
+  };
+  await mod.apply(noExitCtx);
+  const res = makeRes();
+  plainRoutes.get(PREFIX + '/shutdown')(makeReq('POST', 'http://127.0.0.1:3080'), res);
+  await new Promise((r) => setTimeout(r, 60));
+  let parsed = null;
+  try { parsed = JSON.parse(res.body); } catch { parsed = null; }
+  check('no exit controller -> shutdown answers 503, not 200',
+    res.statusCode === 503 && parsed !== null && parsed.ok === false && parsed.error === 'no-exit-controller', JSON.stringify(parsed));
+  process.env.DSH_LAUNCHER_SUPERVISED = '1';
+  const res2 = makeRes();
+  plainRoutes.get(PREFIX + '/restart')(makeReq('POST', 'http://127.0.0.1:3080'), res2);
+  await new Promise((r) => setTimeout(r, 60));
+  let parsed2 = null;
+  try { parsed2 = JSON.parse(res2.body); } catch { parsed2 = null; }
+  check('no exit controller -> restart answers 503, not 200',
+    res2.statusCode === 503 && parsed2 !== null && parsed2.error === 'no-exit-controller', JSON.stringify(parsed2));
+  delete process.env.DSH_LAUNCHER_SUPERVISED;
 }
 
 const failed = results.filter((r) => !r.ok);
