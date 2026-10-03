@@ -1,6 +1,6 @@
 {
   "name": "@mostkia/dsh-launcher",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Power controls (shutdown / restart) for DeepSeek Harness plus a Windows tray launcher that can restart it and show its console output.",
   "type": "module",
   "main": "index.js",

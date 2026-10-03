@@ -49,13 +49,14 @@ itself — you opt in explicitly.
 **To uninstall** (the mirror of the above):
 
 1. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`
-2. The tray: run `uninstall.cmd` — from the install directory
-   (`%LOCALAPPDATA%\DSH-Launcher`), or from `tray\uninstall.cmd` in the package.
-   It stops a running tray, clears the start-at-logon entry and the desktop
-   shortcut, and deletes the install directory. It never stops DSH: DSH simply
-   stops being supervised, and you close it whenever you like. Add `-DryRun` to see
-   what it would remove without changing anything, or `-KeepState` to keep the logs
-   in `state\`.
+2. The tray: **right-click the tray icon → Uninstall tray…** (it does the work itself
+   once you confirm). You can also run `uninstall.cmd` from the install directory
+   (`%LOCALAPPDATA%\DSH-Launcher`), or `tray\uninstall.cmd` from the package. Either
+   way it stops a running tray, clears the start-at-logon entry and the desktop
+   shortcut, and deletes the install directory. It never stops DSH: DSH simply stops
+   being supervised, and you close it whenever you like. Add `-DryRun` to see what it
+   would remove without changing anything, or `-KeepState` to keep the logs in
+   `state\`.
 
 ## Requirements
 

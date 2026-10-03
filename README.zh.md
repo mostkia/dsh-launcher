@@ -40,10 +40,11 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.1
 **卸载（与安装对称）**：
 
 1. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`
-2. 托盘：运行 `uninstall.cmd` —— 在安装目录 `%LOCALAPPDATA%\DSH-Launcher` 里，或用包目录下的
-   `tray\uninstall.cmd`。它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、删除安装目录；
-   但**不会**停 DSH —— DSH 只是不再被托管，你想什么时候关就什么时候关。
-   加 `-DryRun` 可先看它会删什么（不改动任何东西），加 `-KeepState` 则保留 `state\` 里的日志。
+2. 托盘：**右键托盘图标 →「卸载托盘…」**（确认后它自己完成卸载）；也可以在安装目录
+   `%LOCALAPPDATA%\DSH-Launcher` 里运行 `uninstall.cmd`，或用包目录下的 `tray\uninstall.cmd`。
+   它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、删除安装目录；但**不会**停 DSH ——
+   DSH 只是不再被托管，你想什么时候关就什么时候关。加 `-DryRun` 可先看它会删什么（不改动任何东西），
+   加 `-KeepState` 则保留 `state\` 里的日志。
 
 ## 环境要求
 

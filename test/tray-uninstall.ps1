@@ -192,6 +192,24 @@ try {
     Assert 'the foreign shortcut is untouched' (Test-Path -LiteralPath $lnk6)
     Assert 'the foreign registry value is untouched' ((Get-ScratchRunValue) -like ('*' + $other + '*'))
     Assert 'the installed directory is still removed' (-not (Test-Path -LiteralPath $s6.dir))
+
+    # ---------------------------------------------------------------- case 7
+    # The gap this case exists for: the installer used to copy only the tray, so the
+    # installed folder could not uninstall itself and the README told users to run a
+    # script that was not there. Install into a scratch directory, then let the copy
+    # inside that directory take the installation off again.
+    Write-Host '== case 7: the installer brings the uninstaller with it =='
+    $s7 = Join-Path $work 'roundtrip'
+    $out7 = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $traySource 'install.ps1') -TargetDir $s7 -NoShortcut -Dir $work -Port $TrayPort 2>&1 | Out-String
+    Assert 'installing into a scratch directory succeeds' ($LASTEXITCODE -eq 0) ('exit=' + $LASTEXITCODE + ' ' + $out7.Trim())
+    Assert 'the tray script is there' (Test-Path -LiteralPath (Join-Path $s7 'dsh-launcher-tray.ps1'))
+    Assert 'uninstall.cmd travels with the tray' (Test-Path -LiteralPath (Join-Path $s7 'uninstall.cmd'))
+    Assert 'uninstall.ps1 travels with the tray' (Test-Path -LiteralPath (Join-Path $s7 'uninstall.ps1'))
+    $info7 = [System.IO.File]::ReadAllText((Join-Path $s7 'install.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    Assert 'install.json records the uninstaller' ([bool]([string]$info7.uninstall -like '*uninstall.cmd'))
+    $out7 = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $s7 'uninstall.ps1') -InstallDir $s7 -ShortcutPath (Join-Path $s7 'none.lnk') -RunKeyPath $scratchKey -RunValueName 'TestLauncher' 2>&1 | Out-String
+    Assert 'the copied uninstaller removes its own installation' ($LASTEXITCODE -eq 0) ('exit=' + $LASTEXITCODE + ' ' + $out7.Trim())
+    Assert 'nothing is left behind' (-not (Test-Path -LiteralPath $s7))
 } finally {
     try { $runKey.DeleteSubKeyTree($scratchKey, $false) } catch { }
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $work + '*')) } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch { } }

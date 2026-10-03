@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.2 — 2026-10-03
+
+### Fixed
+
+- **The installed folder could not uninstall itself.** `install.ps1` copied the tray
+  but not the uninstaller, so `%LOCALAPPDATA%\DSH-Launcher\uninstall.cmd` - the path
+  the README pointed at - did not exist; the only copy was in the package, where a
+  user has no reason to look. The installer now copies `uninstall.cmd` and
+  `uninstall.ps1` alongside the tray, and records it as `uninstall` in
+  `install.json`.
+
+### Added
+
+- **"Uninstall tray" in the tray menu.** Right-click the icon and pick it: the tray
+  asks for confirmation, then hands the job to `uninstall.ps1` in a separate process
+  (the uninstaller stops the tray and deletes the files the tray runs from, so it
+  must not depend on the tray surviving). Nobody has to find a script any more, which
+  was the actual complaint behind the bug above.
+- `install.ps1 -TargetDir`, so the installer can be pointed at a scratch directory -
+  which is what lets the suite install and uninstall in one go. The suite now covers
+  that round trip: install, assert the uninstaller travelled with the tray, then let
+  the copy inside the installed folder remove the installation.
+
 ## 0.1.1 — 2026-10-03
 
 ### Added

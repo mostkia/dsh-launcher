@@ -650,8 +650,9 @@ $miAuto = $menu.Items.Add((T 'menu.autostart.off'))
 $miAuto.CheckOnClick = $false
 $miOpen = $menu.Items.Add((T 'menu.open'))
 $miLog  = $menu.Items.Add((T 'menu.log'))
-$null   = $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
-$miQuit = $menu.Items.Add((T 'menu.quit'))
+$null        = $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+$miUninstall = $menu.Items.Add((T 'menu.uninstall'))
+$miQuit      = $menu.Items.Add((T 'menu.quit'))
 $ni.ContextMenuStrip = $menu
 
 # Read the logon-start state once at startup (a failure counts as "off" and is
@@ -821,6 +822,29 @@ $miLog.add_Click({
 $miQuit.add_Click({
     $r = [System.Windows.Forms.MessageBox]::Show((T 'quit.text'), (T 'quit.title'), 'YesNo', 'Question')
     if ($r -eq 'Yes') { $script:ExitWhenChildEnds = $true; Quit-Tray }
+})
+# Uninstalling has to happen in another process: the uninstaller stops this very tray
+# and deletes the files we run from, so it cannot depend on us surviving the first
+# step. $PSScriptRoot is the install directory - or the package's tray\ folder when
+# the tray was started straight from a checkout - and install.cmd puts uninstall.ps1
+# right next to the tray script, so the menu item works without hunting for a file.
+$miUninstall.add_Click({
+    $r = [System.Windows.Forms.MessageBox]::Show((T 'uninstall.text'), (T 'uninstall.title'), 'YesNo', 'Warning')
+    if ($r -ne 'Yes') { return }
+    $uninstaller = Join-Path $PSScriptRoot 'uninstall.ps1'
+    if (-not (Test-Path -LiteralPath $uninstaller)) {
+        $ni.ShowBalloonTip(5000, (T 'balloon.title'), (T 'balloon.uninstallmissing'), 'Error')
+        Write-TrayLog 'uninstall: uninstall.ps1 is not next to the tray script'
+        return
+    }
+    try {
+        Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $uninstaller) -WindowStyle Hidden
+        $ni.ShowBalloonTip(5000, (T 'balloon.title'), (T 'balloon.uninstalling'), 'Info')
+        Write-TrayLog ('uninstall requested from the tray menu: ' + $uninstaller)
+    } catch {
+        $ni.ShowBalloonTip(5000, (T 'balloon.title'), (T 'balloon.uninstallfailed'), 'Error')
+        Write-TrayLog ('uninstall launch failed: ' + $_.Exception.Message)
+    }
 })
 $ni.add_MouseDoubleClick({
     if ($form.Visible) { $form.Hide() } else { Show-TrayWindow }

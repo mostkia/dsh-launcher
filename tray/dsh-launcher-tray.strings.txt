@@ -22,6 +22,7 @@ menu.autostart.on=开机自启动(&A)（已开启）
 menu.open=打开 DSH 界面(&O)
 menu.log=打开日志文件(&L)
 menu.quit=关闭 DSH 并退出托盘(&Q)
+menu.uninstall=卸载托盘(&U)…
 
 balloon.title=DSH
 balloon.starting=DSH 正在启动
@@ -54,3 +55,11 @@ already.p4=现在这个托盘不会启动第二个 dsh；你可以用右键菜�
 
 startfail.body=启动失败：子进程无法创建（详见托盘日志）
 msg.trayrunning=DSH 托盘已在运行，请看右下角通知区域里的图标。
+
+# Uninstalling from the tray menu. The tray hands the job to uninstall.ps1 (a separate
+# process, so it survives the tray being stopped) - the user never has to find a file.
+uninstall.title=卸载托盘
+uninstall.text=将卸载托盘：停止托盘、清除开机自启动项与桌面快捷方式、删除安装目录。不会停止 DSH（它只是不再被托管），也不会移除插件本体。继续？
+balloon.uninstalling=托盘正在卸载；插件本体请用 dsh plugin --profile web remove @mostkia/dsh-launcher 单独移除。
+balloon.uninstallmissing=找不到卸载脚本：安装目录里缺少 uninstall.ps1，请改用包目录下的 tray\uninstall.cmd。
+balloon.uninstallfailed=卸载启动失败：无法创建卸载进程，详见托盘日志。

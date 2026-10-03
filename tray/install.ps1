@@ -21,6 +21,7 @@
 param(
     [string]$Dir = '',
     [int]$Port = 3080,
+    [string]$TargetDir = '',
     [switch]$NoShortcut
 )
 
@@ -29,8 +30,8 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($Here)) { $Here = (Get-Location).Path }
 if ([string]::IsNullOrWhiteSpace($Dir)) { $Dir = (Get-Location).Path }
-
-$TargetDir = Join-Path $env:LOCALAPPDATA 'DSH-Launcher'
+if ([string]::IsNullOrWhiteSpace($TargetDir)) { $TargetDir = Join-Path $env:LOCALAPPDATA 'DSH-Launcher' }
+$TargetDir = [System.IO.Path]::GetFullPath($TargetDir)
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 Write-Host '[install] DSH Launcher tray'
@@ -43,7 +44,10 @@ if (-not (Test-Path -LiteralPath $TargetDir)) {
 }
 
 # ------------------------------------------------------------- copy the files
-$Files = @('dsh-launcher-tray.ps1', 'dsh-launcher-tray.strings.txt', 'dsh-launcher-tray.vbs', 'dsh-whale.ico')
+# The uninstaller travels with the tray on purpose: the installed folder can then
+# take itself off the machine, and nobody has to go hunting for a script in the
+# package (or in the repository) later.
+$Files = @('dsh-launcher-tray.ps1', 'dsh-launcher-tray.strings.txt', 'dsh-launcher-tray.vbs', 'dsh-whale.ico', 'uninstall.cmd', 'uninstall.ps1')
 foreach ($f in $Files) {
     $src = Join-Path $Here $f
     if (-not (Test-Path -LiteralPath $src)) { throw ('missing source file: ' + $src) }
@@ -80,6 +84,7 @@ $info = [ordered]@{
     wscript     = $Wscript
     vbs         = $VbsPath
     trayPs1     = $Ps1Path
+    uninstall   = (Join-Path $TargetDir 'uninstall.cmd')
     ico         = $IcoPath
     dir         = $Dir
     port        = $Port
@@ -135,6 +140,7 @@ Write-Host ('  install dir : ' + $TargetDir)
 Write-Host ('  install.json: ' + $jsonPath)
 Write-Host ('  working dir : ' + $Dir)
 Write-Host ('  port        : ' + $Port)
+Write-Host ('  uninstall   : ' + (Join-Path $TargetDir 'uninstall.cmd') + '   (or right-click the tray icon)')
 if ($NoShortcut) {
     Write-Host '  shortcut    : skipped (-NoShortcut)'
 } elseif ($ShortcutCreated) {
