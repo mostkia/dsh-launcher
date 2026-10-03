@@ -2,8 +2,23 @@
  * Zero-risk harness for the @mostkia/dsh-launcher host half.
  * Stubs the cordis context and the web server, then exercises every endpoint:
  * routing, method guard, CSRF guard, supervisor detection and graceful exit.
+ *
+ * Hermetic on purpose: %LOCALAPPDATA% is redirected to a scratch directory before
+ * any check runs. Without that, a machine that really has the tray installed
+ * makes the "no tray yet" checks false - and the autostart-enable check would
+ * write the runner's own HKCU Run entry, i.e. the test would change the machine
+ * it is testing on. With the redirection the "not installed" state is true here
+ * and the enable path is rejected before it can reach the registry.
+ *
  * Run: node test/host-half.test.mjs
  */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const SANDBOX_HOME = mkdtempSync(join(tmpdir(), 'dsh-launcher-hosttest-'));
+process.env.LOCALAPPDATA = SANDBOX_HOME;
+
 const MODULE_URL = new URL('../index.js', import.meta.url).href;
 const PREFIX = '/_dsh-launcher';
 
@@ -135,10 +150,7 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
 
 // A malformed install.json must be treated as "not installed", never crash.
 {
-  const { mkdirSync, writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const { join } = await import('node:path');
-  const base = join(tmpdir(), 'dsh-launcher-test-' + process.pid);
+  const base = SANDBOX_HOME;
   mkdirSync(base + '\\DSH-Launcher', { recursive: true });
   writeFileSync(base + '\\DSH-Launcher\\install.json', '{ this is not json', 'utf8');
   process.env.LOCALAPPDATA = base;
@@ -162,5 +174,6 @@ check('owns its namespace only', [...routes.keys()].every((p) => p.startsWith(PR
 }
 
 const failed = results.filter((r) => !r.ok);
+rmSync(SANDBOX_HOME, { recursive: true, force: true });
 console.log('\n' + (failed.length === 0 ? 'ALL PASS' : 'FAILURES: ' + failed.length) + '  (' + results.length + ' checks)');
 process.exit(failed.length === 0 ? 0 : 1);
