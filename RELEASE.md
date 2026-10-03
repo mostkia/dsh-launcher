@@ -10,6 +10,7 @@ is `v0.1.0`. Run everything below from the repository root.
 ```bash
 git status --short                      # clean working tree
 node test/host-half.test.mjs            # 17 checks, exit 0
+node test/client-half.test.mjs          # 14 checks, exit 0
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
                                         # 9 assertions, exit 0
 npm pack --dry-run --cache .npm-pack    # 16 entries; test/ and tools/ absent

@@ -86,6 +86,9 @@ Both halves ship with a test that needs no real DSH session:
 # host half: endpoints, guards, exit codes, autostart states (17 checks)
 node test/host-half.test.mjs
 
+# client half: slot registration and locale completeness, no browser needed
+node test/client-half.test.mjs
+
 # tray: the supervision probe and both restart paths, against a fake DSH
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 ```

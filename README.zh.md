@@ -69,6 +69,9 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 # 宿主半部：端点、守卫、退出码、自启状态（17 项）
 node test/host-half.test.mjs
 
+# 客户端半部：槽位注册与中英文案完整性（无需浏览器）
+node test/client-half.test.mjs
+
 # 托盘：监督探测与两条重启路径（对着假 dsh 跑）
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 ```
