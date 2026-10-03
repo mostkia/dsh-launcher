@@ -37,6 +37,34 @@ function Assert([string]$label, [bool]$ok) {
     if ($ok) { Write-Host ('  PASS  ' + $label) } else { Write-Host ('  FAIL  ' + $label); $script:Failures++ }
 }
 
+# The tray only manages a child when it owns the port. A leftover child from an
+# earlier run (or any other listener) makes it take the already-serving branch, so
+# every assertion below would fail for a reason that has nothing to do with the
+# code. Wait for the port instead, and say so when it never frees up.
+function Test-PortFree([int]$port) {
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $client.Connect('127.0.0.1', $port)
+        return $false
+    } catch {
+        return $true
+    } finally {
+        $client.Close()
+    }
+}
+
+$waited = 0
+while (-not (Test-PortFree $Port)) {
+    if ($waited -ge 60) {
+        Write-Host ('port ' + $Port + ' is still in use after ' + $waited + 's; something else is listening there')
+        Write-Host 'TRAY SUPERVISION TEST FAIL (precondition); work dir kept: ' + $work
+        exit 1
+    }
+    if ($waited -eq 0) { Write-Host ('waiting for port ' + $Port + ' to become free ...') }
+    Start-Sleep -Seconds 2
+    $waited += 2
+}
+
 function Run-Case([string]$mode) {
     Write-Host ('== case: ' + $mode + ' ==')
     Remove-Item (Join-Path $work 'requests.log') -Force -ErrorAction SilentlyContinue
