@@ -24,7 +24,7 @@
 # Usage:
 #   powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File dsh-launcher-tray.ps1
 #   Debug: -Headless (no UI, echo the output to the console)
-#          -ShowWindowOnStart, -AutoExitSeconds N, -TestRestartSeconds N (self-test helpers)
+#          -ShowWindowOnStart, -AutoExitSeconds N, -TestRestartSeconds N, -TestAutoStart
 #
 # Defaults: -Dir / -Port come from %LOCALAPPDATA%\DSH-Launcher\install.json (written
 # by install.ps1) and fall back to $env:USERPROFILE and 3080.
@@ -37,7 +37,8 @@ param(
     [switch]$Headless,
     [switch]$ShowWindowOnStart,
     [int]$AutoExitSeconds = 0,
-    [int]$TestRestartSeconds = 0
+    [int]$TestRestartSeconds = 0,
+    [switch]$TestAutoStart
 )
 
 $ErrorActionPreference = 'Continue'
@@ -290,9 +291,10 @@ $script:Supervised = $true
 $script:StatusEndpoint = '/_dsh-launcher/status'
 $script:RestartEndpoint = '/_dsh-launcher/restart'
 $script:ShutdownEndpoint = '/_dsh-launcher/shutdown'
-$script:AutoStartKey   = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Run'
+$script:AutoStartSubKey = 'Software\Microsoft\Windows\CurrentVersion\Run'
 $script:AutoStartValue = 'DSHLauncher'
 $script:AutoStartOn    = $false
+$script:AutoStartCommand = ''
 
 $script:CodePage = [System.Text.Encoding]::Default.CodePage
 try {
@@ -375,12 +377,23 @@ function Test-Supervised {
 # Same key and same value name as the plugin host half (index.js), so the tray
 # menu and the DSH power dialog never disagree about the state.
 function Get-AutoStartState {
+    # .NET registry access on purpose. The stored value is a quoted command line,
+    # and Windows PowerShell 5.1 mangles embedded quotes while marshalling
+    # arguments to reg.exe (it stored the command WITHOUT its quotes, which only
+    # works while both paths happen to contain no spaces). Talking to the
+    # registry API directly stores and reads the exact string.
+    $script:AutoStartCommand = ''
     try {
-        $out = & reg.exe query $script:AutoStartKey /v $script:AutoStartValue 2>&1
-        if ($LASTEXITCODE -eq 0) { return $true }
-        return $false
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($script:AutoStartSubKey)
+        if ($null -eq $key) { return $false }
+        try {
+            $value = $key.GetValue($script:AutoStartValue, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+            if ($null -eq $value) { return $false }
+            $script:AutoStartCommand = [string]$value
+            return (-not [string]::IsNullOrWhiteSpace($script:AutoStartCommand))
+        } finally { $key.Close() }
     } catch {
-        Write-TrayLog ('autostart query failed: ' + $_.Exception.Message)
+        Write-TrayLog ('autostart read failed: ' + $_.Exception.Message)
         return $false
     }
 }
@@ -396,15 +409,31 @@ function Set-AutoStart([bool]$enable) {
     } catch { }
     if ([string]::IsNullOrWhiteSpace($wscript)) { $wscript = Join-Path $env:SystemRoot 'System32\wscript.exe' }
     if ([string]::IsNullOrWhiteSpace($vbs)) { $vbs = Join-Path $PSScriptRoot 'dsh-launcher-tray.vbs' }
+    $cmd = '"' + $wscript + '" "' + $vbs + '"'
     try {
-        if ($enable) {
-            $cmd = '"' + $wscript + '" "' + $vbs + '"'
-            # Arguments go to reg.exe as an array, never through cmd: quoting stays literal.
-            $null = & reg.exe add $script:AutoStartKey /v $script:AutoStartValue /t REG_SZ /d $cmd /f 2>&1
-        } else {
-            $null = & reg.exe delete $script:AutoStartKey /v $script:AutoStartValue /f 2>&1
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($script:AutoStartSubKey, $true)
+        if ($null -eq $key) {
+            Write-TrayLog 'autostart write failed: the Run key is not readable'
+            return $false
         }
-        return ($LASTEXITCODE -eq 0)
+        try {
+            if ($enable) {
+                $key.SetValue($script:AutoStartValue, $cmd, [Microsoft.Win32.RegistryValueKind]::String)
+            } elseif ($null -ne $key.GetValue($script:AutoStartValue)) {
+                $key.DeleteValue($script:AutoStartValue, $false)
+            }
+        } finally { $key.Close() }
+        if ($enable) {
+            # Read the value back and compare: a silent quoting or encoding
+            # mismatch must never be reported as success.
+            $present = Get-AutoStartState
+            if (-not $present -or $script:AutoStartCommand -ne $cmd) {
+                Write-TrayLog ('autostart verify failed: stored=[' + $script:AutoStartCommand + '] expected=[' + $cmd + ']')
+                return $false
+            }
+            return $true
+        }
+        return (-not (Get-AutoStartState))
     } catch {
         Write-TrayLog ('autostart set failed: ' + $_.Exception.Message)
         return $false
@@ -502,6 +531,30 @@ function Restart-Dsh {
     $null = Wait-PortFree $Port 10
     if (Start-Dsh) { return 'forced' }
     return 'failed'
+}
+
+# ------------------------------------------------------- start-at-logon check
+# Non-interactive proof of the logon-start path: read, add, verify the stored
+# string byte for byte, remove, verify gone. An existing entry is never touched.
+if ($TestAutoStart) {
+    Write-Host ('[dsh-tray] autostart self-test; value={0} key=HKCU\{1}' -f $script:AutoStartValue, $script:AutoStartSubKey)
+    $presentBefore = Get-AutoStartState
+    Write-Host ('  before  : present={0} command=[{1}]' -f $presentBefore, $script:AutoStartCommand)
+    if ($presentBefore) {
+        Write-Host '  an entry already exists; leaving it untouched'
+        exit 3
+    }
+    $enabled = Set-AutoStart $true
+    Write-Host ('  enable  : ok={0} command=[{1}]' -f $enabled, $script:AutoStartCommand)
+    $disabled = Set-AutoStart $false
+    $presentAfter = Get-AutoStartState
+    Write-Host ('  disable : ok={0} present-after={1}' -f $disabled, $presentAfter)
+    if ($enabled -and $disabled -and (-not $presentAfter)) {
+        Write-Host '  AUTOSTART SELF-TEST PASS'
+        exit 0
+    }
+    Write-Host '  AUTOSTART SELF-TEST FAIL'
+    exit 2
 }
 
 # ---------------------------------------------------------------- headless mode
