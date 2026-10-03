@@ -46,6 +46,36 @@ if ([string]::IsNullOrWhiteSpace($ShortcutPath)) {
 $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 if ($InstallDir.EndsWith('\')) { $InstallDir = $InstallDir.TrimEnd('\') }
 
+# The same folder can be spelled more than one way: as given, in long form, or as an
+# 8.3 short name - GitHub's Windows runners hand out %TEMP% as C:\Users\RUNNER~1\...,
+# while GetFullPath returns the long form. A registry value, a shortcut and a process
+# command line may each hold a different spelling, so every ownership check below
+# asks "does this mention any spelling of our folder?" instead of trusting one.
+function Get-PathVariants([string]$path) {
+    $variants = New-Object System.Collections.ArrayList
+    [void]$variants.Add($path)
+    try {
+        $full = [System.IO.Path]::GetFullPath($path)
+        if ($full.EndsWith('\')) { $full = $full.TrimEnd('\') }
+        if (-not $variants.Contains($full)) { [void]$variants.Add($full) }
+    } catch { }
+    try {
+        $fso = New-Object -ComObject Scripting.FileSystemObject
+        if ($fso.FolderExists($path)) {
+            $short = [string]$fso.GetFolder($path).ShortPath
+            if ($short.EndsWith('\')) { $short = $short.TrimEnd('\') }
+            if (-not $variants.Contains($short)) { [void]$variants.Add($short) }
+        }
+    } catch { }
+    return $variants
+}
+function Test-MentionsPath([string]$text, $variants) {
+    if ([string]::IsNullOrEmpty($text)) { return $false }
+    foreach ($variant in $variants) { if ($text -like ('*' + $variant + '*')) { return $true } }
+    return $false
+}
+$pathVariants = Get-PathVariants $InstallDir
+
 Report ('install directory: ' + $InstallDir)
 if ($DryRun) { Report 'dry run: nothing will be changed' }
 
@@ -71,8 +101,8 @@ if ($NoStop) {
     $candidates = @()
     try {
         $candidates = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
-            $_.CommandLine -and ($_.CommandLine -like ('*' + $InstallDir + '*')) -and
-            ($_.CommandLine -match 'dsh-launcher-tray\.(ps1|vbs)')
+            (Test-MentionsPath ([string]$_.CommandLine) $pathVariants) -and
+            ([string]$_.CommandLine -match 'dsh-launcher-tray\.(ps1|vbs)')
         })
     } catch {
         Warn ('could not list processes: ' + $_.Exception.Message)
@@ -84,9 +114,9 @@ if ($NoStop) {
         $logPath = Join-Path $InstallDir 'state\dsh-tray.log'
         if (Test-Path -LiteralPath $logPath) {
             try {
-                $matches = [regex]::Matches([System.IO.File]::ReadAllText($logPath, [System.Text.Encoding]::UTF8), 'tray starting \(pid (\d+)\)')
-                if ($matches.Count -gt 0) {
-                    $recorded = [int]$matches[$matches.Count - 1].Groups[1].Value
+                $pidMatches = [regex]::Matches([System.IO.File]::ReadAllText($logPath, [System.Text.Encoding]::UTF8), 'tray starting \(pid (\d+)\)')
+                if ($pidMatches.Count -gt 0) {
+                    $recorded = [int]$pidMatches[$pidMatches.Count - 1].Groups[1].Value
                     $process = Get-Process -Id $recorded -ErrorAction SilentlyContinue
                     if ($null -ne $process -and $process.ProcessName -eq 'powershell') {
                         Report ('tray process ' + $recorded + ' found through its log')
@@ -99,6 +129,20 @@ if ($NoStop) {
         }
     }
     if ($candidates.Count -eq 0) {
+        # Last resort: the tray's single-instance mutex is the authoritative "a tray is
+        # running for this port" signal. If it says one is there but no process could be
+        # identified, say so instead of leaving locked files behind unexplained.
+        $port = 0
+        if ($null -ne $info -and ($info.PSObject.Properties.Name -contains 'port')) { $port = [int]$info.port }
+        if ($port -gt 0) {
+            $mutex = New-Object System.Threading.Mutex($false, ('Local\dsh-tray-launcher-' + $port))
+            $free = $mutex.WaitOne(0)
+            if ($free) { [void]$mutex.ReleaseMutex() }
+            $mutex.Dispose()
+            if (-not $free) {
+                Warn ('a tray for port ' + $port + ' is still running but its process could not be identified; quit it from its tray menu and run this again')
+            }
+        }
         Report 'tray process: not running'
     } else {
         foreach ($candidate in $candidates) {
@@ -128,7 +172,7 @@ try {
             $current = [string]$runKey.GetValue($RunValueName, '')
             if ([string]::IsNullOrWhiteSpace($current)) {
                 Report 'start-at-logon: not registered'
-            } elseif ($current -like ('*' + $InstallDir + '*')) {
+            } elseif (Test-MentionsPath $current $pathVariants) {
                 if (-not $DryRun) { $runKey.DeleteValue($RunValueName, $false) }
                 Report 'start-at-logon: removed'
             } else {
@@ -147,9 +191,9 @@ if (-not (Test-Path -LiteralPath $ShortcutPath)) {
     try {
         $shell = New-Object -ComObject WScript.Shell
         $link = $shell.CreateShortcut($ShortcutPath)
-        $pointsAtUs = (([string]$link.Arguments) -like ('*' + $InstallDir + '*')) -or
-                      (([string]$link.IconLocation) -like ('*' + $InstallDir + '*')) -or
-                      (([string]$link.TargetPath) -like ('*' + $InstallDir + '*'))
+        $pointsAtUs = (Test-MentionsPath ([string]$link.Arguments) $pathVariants) -or
+                      (Test-MentionsPath ([string]$link.IconLocation) $pathVariants) -or
+                      (Test-MentionsPath ([string]$link.TargetPath) $pathVariants)
         if ($pointsAtUs) {
             if (-not $DryRun) { Remove-Item -LiteralPath $ShortcutPath -Force }
             Report 'desktop shortcut: removed'
