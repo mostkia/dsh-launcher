@@ -6,7 +6,7 @@
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File make-icon.ps1 `
-#       -SourcePng <white-background png> -OutIco dsh.ico -OutPng dsh-logo.png
+#       -SourcePng <white-background png> -OutIco dsh-whale.ico -OutPng dsh-logo.png
 #
 param(
     [Parameter(Mandatory = $true)][string]$SourcePng,

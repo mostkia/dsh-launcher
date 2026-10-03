@@ -52,6 +52,13 @@ and covered by tests.
   into exit code 0.
 - **Client:** Escape and a backdrop click no longer dismiss the dialog while an
   action is running, so its outcome cannot be hidden by accident.
+- **Layout:** the power action now sits in the same row as Settings, at its right,
+  instead of taking a row of its own above it. The 56px rail still stacks the two
+  icons, where there is no horizontal room to share.
+- **Shortcut:** the desktop shortcut's icon was stored as `"path",0` - literal
+  quotes around the path - which Explorer could not resolve, so it drew the blank
+  document icon. The icon file was renamed as well, which gives the shell's icon
+  cache a fresh key, and the installer now nudges that cache.
 
 ### Notes
 

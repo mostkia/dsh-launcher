@@ -99,12 +99,21 @@ window.__ModuleLoader__.load({
     };
 
     const CSS = [
+      // The shell gives this seat its own row above Settings, and the foot stacks
+      // the two rows in a column. To sit *beside* Settings instead - which is how
+      // the layout is meant to read - the wide-mode button becomes a compact pill
+      // floating over the right end of the Settings row: the negative bottom margin
+      // cancels the row it would otherwise occupy (so no height is wasted and
+      // Settings moves up into it), while top/z-index place it inside that row and
+      // above it for pointer events. Only the wide column does this; the 56px rail
+      // keeps two stacked icons, where there is no horizontal room to share.
       '.dsl-power{box-sizing:border-box;display:flex;align-items:center;gap:8px;height:36px;min-height:36px;',
-      'width:calc(100% + 4px);margin:0 -2px;padding:7px 8px;border:none;border-radius:var(--dsw-radius-md);background:transparent;',
+      'width:auto;margin:0 -2px -36px auto;padding:7px 10px;border:none;border-radius:var(--dsw-radius-md);background:transparent;',
+      'position:relative;z-index:2;top:7px;',
       'color:var(--dsw-alias-label-primary);font:inherit;line-height:22px;text-align:left;cursor:pointer}',
       '.dsl-power:hover{background:var(--dsw-alias-interactive-bg-hover)}',
       '.dsl-power:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
-      '.dsl-power--rail{width:36px;justify-content:center;margin:0;padding:0}',
+      '.dsl-power--rail{width:36px;justify-content:center;margin:0;padding:0;top:0;z-index:auto}',
       '.dsl-power__glyph{flex:none;display:inline-flex;align-items:center;justify-content:center}',
       '.dsl-power__label{white-space:nowrap}',
       '.dsl-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;',

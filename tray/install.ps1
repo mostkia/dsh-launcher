@@ -4,7 +4,7 @@
 # as ANSI/GBK, so no Chinese literal may appear here (install.cmd is ASCII too).
 #
 # What it does (idempotent - safe to run again for an upgrade):
-#   1. Copies dsh-launcher-tray.ps1 / .strings.txt / .vbs / dsh.ico into
+#   1. Copies dsh-launcher-tray.ps1 / .strings.txt / .vbs / dsh-whale.ico into
 #      %LOCALAPPDATA%\DSH-Launcher (created if missing, overwritten if present).
 #   2. Writes %LOCALAPPDATA%\DSH-Launcher\install.json - the shared source of
 #      truth between this tray and the @mostkia/dsh-launcher plugin host half.
@@ -43,7 +43,7 @@ if (-not (Test-Path -LiteralPath $TargetDir)) {
 }
 
 # ------------------------------------------------------------- copy the files
-$Files = @('dsh-launcher-tray.ps1', 'dsh-launcher-tray.strings.txt', 'dsh-launcher-tray.vbs', 'dsh.ico')
+$Files = @('dsh-launcher-tray.ps1', 'dsh-launcher-tray.strings.txt', 'dsh-launcher-tray.vbs', 'dsh-whale.ico')
 foreach ($f in $Files) {
     $src = Join-Path $Here $f
     if (-not (Test-Path -LiteralPath $src)) { throw ('missing source file: ' + $src) }
@@ -70,7 +70,7 @@ try {
 $Wscript  = Join-Path $env:SystemRoot 'System32\wscript.exe'
 $VbsPath  = Join-Path $TargetDir 'dsh-launcher-tray.vbs'
 $Ps1Path  = Join-Path $TargetDir 'dsh-launcher-tray.ps1'
-$IcoPath  = Join-Path $TargetDir 'dsh.ico'
+$IcoPath  = Join-Path $TargetDir 'dsh-whale.ico'
 
 # ------------------------------------------------------------- install.json
 # Same JSON layout the plugin host half reads (index.js readInstallInfo).
@@ -102,11 +102,24 @@ if ($NoShortcut) {
         $lnk.TargetPath = $Wscript
         $lnk.Arguments = '"' + $VbsPath + '"'
         $lnk.WorkingDirectory = $Dir
-        $lnk.IconLocation = '"' + $IcoPath + '",0'
+        # Plain "path,index" with no surrounding quotes: the shell parses this form
+        # and adds its own quoting when it stores the link. Literal quotes around
+        # the path made Explorer fail to resolve the icon and fall back to the
+        # generic document icon - the blank desktop shortcut.
+        $lnk.IconLocation = $IcoPath + ',0'
         $lnk.Description = 'DSH Launcher (tray)'
         $lnk.Save()
         $ShortcutCreated = $true
         Write-Host ('[install] shortcut: ' + $ShortcutPath)
+        # Best effort: nudge the shell to rebuild its icon cache, so the whale shows
+        # without a re-login. The icon file name changed as well, which gives the
+        # entry a fresh cache key either way.
+        try {
+            $ie4u = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
+            if (Test-Path -LiteralPath $ie4u) {
+                Start-Process -FilePath $ie4u -ArgumentList '-show' -WindowStyle Hidden -ErrorAction SilentlyContinue
+            }
+        } catch { }
     } catch {
         # Not fatal: install.json is already written, so the plugin half and a
         # manual wscript call both still work.

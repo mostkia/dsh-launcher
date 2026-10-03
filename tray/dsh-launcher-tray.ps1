@@ -612,7 +612,7 @@ if ($Headless) {
 # ---------------------------------------------------------------- UI
 # Official DSH whale mark (black), rendered from the frontend favicon.svg into a
 # multi-size .ico by tools\make-icon.ps1; fall back to the stock icon when absent.
-$script:IconPath = Join-Path $PSScriptRoot 'dsh.ico'
+$script:IconPath = Join-Path $PSScriptRoot 'dsh-whale.ico'
 $script:TrayIcon = $null
 try {
     if (Test-Path -LiteralPath $script:IconPath) { $script:TrayIcon = New-Object System.Drawing.Icon($script:IconPath) }
