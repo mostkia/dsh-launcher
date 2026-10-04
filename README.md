@@ -19,9 +19,9 @@ on screen).
 
 ## Screenshots
 
-| Power dialog, light | Sidebar power button | Power dialog, dark |
+| Sidebar power button | Power dialog, light | Power dialog, dark |
 |:--:|:--:|:--:|
-| ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![the power action beside Settings in the sidebar](docs/screenshots/sidebar-power.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) |
+| ![the power action beside Settings in the sidebar](docs/screenshots/sidebar-power.png) | ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) |
 
 The dialog follows the host theme because every colour, radius and shadow comes
 from theme tokens. The action itself uses the shell's own sidebar foot seat, beside
@@ -34,9 +34,12 @@ Settings, and takes no row of its own.
 dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 ```
 
-Then restart DSH once. The Windows tray is installed during that restart, by the
-plugin itself - it carries the tray and puts it in place, which is why the system may
-ask for permission (it installs the tray and creates the shortcut). After the restart
+Once the install finishes, the power menu is available first - but nothing has taken
+effect until DSH is restarted, so the feature set is incomplete until then.
+
+Restart DSH once: the tray launcher installs itself automatically during that restart.
+Antivirus or system prompts may appear (the plugin needs to install the tray and create
+the shortcut) - allow them, they are normally not a false positive. After the restart
 the desktop shortcut exists: close DSH once more and start it from that shortcut, and
 every feature is available. Start-at-logon is off by default; turn it on from the tray
 menu, or from the power dialog inside DSH, if you want it.
@@ -48,9 +51,9 @@ menu, or from the power dialog inside DSH, if you want it.
 dsh plugin --profile web remove @mostkia/dsh-launcher
 ```
 
-To remove the tray: open the tray, find the DSH launcher (the black whale icon) and
-**right-click the tray icon → Uninstall tray…**. That stops the running tray and clears
-the start-at-logon entry, the desktop shortcut and the launcher itself.
+**Removing the tray launcher:** open the tray, find the DSH launcher (the black whale
+icon) and **right-click the tray icon → Uninstall tray…**. That stops the running tray
+and clears the start-at-logon entry, the desktop shortcut and the launcher itself.
 
 **The power plugin and the tray launcher uninstall independently, and that is
 deliberate: if you only want part of the set, keep that part.**
