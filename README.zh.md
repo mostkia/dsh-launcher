@@ -5,7 +5,7 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 🌏 [English](./README.md) · **简体中文**
 
 ## 这套东西包含什么
-这是一套完整的开关启动插件，为原版dsh新增开关机重启按钮（以后关闭服务器不用命令行按Ctal+C了）、系统启动器（直接提供快捷方式启动、开机自启动功能）、托盘管理（不用再保着难看的命令行黑框了）
+这是一套完整的开关启动插件，为原版dsh新增开关机重启按钮（以后关闭服务器不用命令行按 Ctrl+C 了）、系统启动器（直接提供快捷方式启动、开机自启动功能）、托盘管理（不用再保着难看的命令行黑框了）
 
 | 部件 | 位置 | 作用 |
 |---|---|---|
@@ -72,6 +72,9 @@ node test/client-half.test.mjs
 
 # 托盘：监督探测与两条重启路径（对着假 dsh 跑）
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
+
+# 托盘安装/卸载往返：装到临时目录 → 断言卸载脚本随行 → 用拷进去的那份把自己卸掉（33 项断言）
+powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-uninstall.ps1
 ```
 
 托盘测试在临时端口用 `test/fake-dsh.mjs`（一个会说插件端点的小 HTTP 服务）当被监督的子进程，

@@ -105,6 +105,10 @@ node test/client-half.test.mjs
 
 # tray: the supervision probe and both restart paths, against a fake DSH
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
+
+# tray install/uninstall round trip: install into a scratch directory, assert the
+# uninstaller travelled with the tray, then let that copy remove it (33 assertions)
+powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-uninstall.ps1
 ```
 
 The tray test runs `test/fake-dsh.mjs` (a tiny HTTP server that speaks the plugin's
