@@ -5,7 +5,7 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 🌏 [English](./README.md) · **简体中文**
 
 ## 这套东西包含什么
-这是一套完整的开关启动插件，为原版dsh新增开关机重启按钮（以后关闭服务器不哟命令行按Ctal+C了）、系统启动器（直接提供快捷方式启动、开机自启动功能）、托盘管理（不用再保着难看的命令行黑框了）
+这是一套完整的开关启动插件，为原版dsh新增开关机重启按钮（以后关闭服务器不用命令行按Ctal+C了）、系统启动器（直接提供快捷方式启动、开机自启动功能）、托盘管理（不用再保着难看的命令行黑框了）
 
 | 部件 | 位置 | 作用 |
 |---|---|---|
@@ -13,59 +13,40 @@ DeepSeek Harness（DSH）的电源控制：侧边栏一个电源按钮，外加�
 | **托盘启动器** | 桌面快捷方式、系统托盘中 | 用于启动DSH及控制查看DSH运行状态 |
 
 ## 截图
-
-| 电源弹窗（浅色） | 电源弹窗（深色） | 侧边栏按钮 |
+| 电源弹窗（浅色） | 侧边栏底部电源按钮 | 电源弹窗（深色） |
 |:--:|:--:|:--:|
-| ![浅色主题下的电源弹窗](docs/screenshots/power-dialog-light.png) | ![深色主题下的电源弹窗](docs/screenshots/power-dialog-dark.png) | ![侧边栏里紧邻“设置”的电源按钮](docs/screenshots/sidebar-power.png) |
+| ![侧边栏里紧邻“设置”的电源按钮](docs/screenshots/sidebar-power.png) | ![浅色主题下的电源弹窗](docs/screenshots/power-dialog-light.png) | ![深色主题下的电源弹窗](docs/screenshots/power-dialog-dark.png) |
 
 弹窗的颜色、圆角、阴影全部来自主题 token，所以跟随宿主明暗主题；电源按钮用的是宿主侧边栏脚部
 自己的槽位，紧邻「设置」，不额外占一行。
 
 ## 安装
-
 ```bash
 # 从 GitHub 装；建议钉住发布 tag
-dsh plugin --profile web add github:mostkia/dsh-launcher#v0.2.0
+dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 ```
+重启一次 DSH，系统托盘安装过程中可能会有提权请求（插件需要安装托盘及创建快捷方式），重启后桌面将生成快捷方式，此时再次关闭DSH，从桌面快捷方式再进入，就能使用全部功能了。
+默认状态不会启动开机自启动，需要的可以在托盘或者DSH电源菜单内启用。
 
-然后重启一次 DSH（`dsh web` 或你现有的启动方式），再刷新页面。
-
-**装到这里就结束了。** 插件自己带着 Windows 托盘，会在这次启动时自动装好：拷到
-`%LOCALAPPDATA%\DSH-Launcher`、建桌面 **DSH Launcher** 快捷方式、并附带卸载脚本。
-包管理器不会替我们跑安装脚本（pnpm 10 以上默认拦截依赖的生命周期脚本，而 dsh 的插件命令
-也没有钩子），所以由插件自己安装自己的搭档；全程**不需要管理员权限**——托盘完全活在你的用户目录里。
-它**不会**主动打开开机自启，要你自己在托盘菜单或弹窗里开。
-
-想让「重启」按钮真正生效，请用桌面 **DSH Launcher** 快捷方式启动 DSH（这样才是被托管状态）。
-
-不想要托盘了？按下面的步骤卸掉即可，之后插件就不会再装它。想手动装也行：包里的
-`tray\install.cmd` 依旧可用；设 `DSH_LAUNCHER_NO_TRAY_INSTALL=1` 可彻底关闭自动安装。
-
-**卸载** —— 两半各自独立，这是刻意的：
-
-1. 托盘：**右键托盘图标 →「卸载托盘…」**（或运行 `%LOCALAPPDATA%\DSH-Launcher\uninstall.cmd`，
-   或用包里的 `tray\uninstall.cmd`）。它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、
-   删除安装目录，但**不会**停 DSH —— DSH 只是不再被托管，你想什么时候关就什么时候关。
-   加 `-DryRun` 可先看它会删什么（不改动任何东西），加 `-KeepState` 则保留 `state\` 里的日志。
-2. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`，然后重启一次 DSH。
-   **这条命令不会删除托盘。** 插件无法可靠察觉自己被卸载（真机实测：运行中的进程仍持有插件、
-   始终没发现 profile 的变化），所以我们宁可如实说明，也不承诺一个不会发生的自动清理 ——
-   卸托盘就用第 1 步。反过来，手动卸托盘**会**被记住：插件不会再把托盘装回来。
+##  卸载
+```bash
+# 从本机移除电源插件
+dsh plugin --profile web remove @mostkia/dsh-launcher
+```
+移除托盘：打开托盘，找到其中的DSH启动器（黑色鲸鱼图标），「右键托盘图标」 →「卸载托盘…」，它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式及启动器本体。
+**电源菜单插件和托盘启动器独立卸载方案，这是刻意设计的，如果你喜欢部分组件功能，可以相应保留**
 
 ## 环境要求
-
-- DSH宿主版本： **0.1.7 或更新**（用到 `sidebar.footer.action`、`ctx.appExit` 与 `webServer` 注册接口）。
+- DSH宿主版本： **0.1.7-rc.1 || 0.1.7-rc.2 或更新**（用到 `sidebar.footer.action`、`ctx.appExit` 与 `webServer` 注册接口）。
 - Node `^22.19.0 || >=24.0.0`（DSH 自身的要求）。
-- 托盘与开机自启**仅 Windows**；插件本体跨平台，遇到不支持时会明确告知。
+- 托盘与开机自启目前**仅支持 Windows**；插件本体跨平台，遇到不支持时会明确告知。
 
 ## 使用
-
 - **侧边栏电源按钮**：`关机` = 优雅退出（退出码 0）；`重启` = 以重启码退出，由托盘重新拉起。
 - **开机自启动**：电源弹窗底部的滑动开关，与托盘右键菜单里那个可勾选项，读写的**是同一个注册表值**（`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` → `DSHLauncher`）。
 - **托盘图标**：双击查看抓取到的控制台输出；右键菜单含 显示/隐藏、启动、重启、打开 DSH 界面、打开日志文件、开机自启动、关闭 DSH 并退出。
 
 ## HTTP 接口（给脚本/其它启动器用）
-
 所有端点会拒绝任何**不是本机回环地址**的 `Origin`（一律 `403`），且都在本插件自己的命名空间下。
 不带 `Origin` 的请求（脚本、`curl`）按设计放行：浏览器在 POST 时一定会带 `Origin`，
 所以"没有这个头"才是 CSRF 守卫该忽略的情形；而**带着 `Origin` 时绝不能因为它的 host 与请求的
@@ -80,7 +61,6 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.2.0
 | `POST` | `/_dsh-launcher/autostart/disable` | 取消开机自启 |
 
 ## 测试
-
 两半都带自测，不需要真实 dsh 会话：
 
 ```bash
@@ -104,7 +84,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 每次 push / PR 都由 CI 跑一遍（`.github/workflows/tests.yml`）。
 
 ## 设计说明
-
 - **刻意零运行时依赖**：所有 `@deepseek-ai/*` 都写在 `peerDependencies`，绝不写进
   `dependencies`——包管理器一旦在 profile 里装出第二份物理副本，包内私有 Symbol 就会分裂，
   宿主调度器会直接报错。
@@ -115,7 +94,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
   各自单装都能用。
 
 ## 致谢与许可
-
 部分功能的实现思路参考了
 [dsh-shutdown](https://github.com/knlght/DSH-shutdown)（MIT），但**未包含其任何代码**。
 托盘图标取自 DSH 前端自带的 `favicon.svg`，用于标识本启动器。
