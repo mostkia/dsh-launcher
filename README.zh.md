@@ -41,14 +41,16 @@ dsh plugin --profile web add github:mostkia/dsh-launcher#v0.2.0
 不想要托盘了？按下面的步骤卸掉即可，之后插件就不会再装它。想手动装也行：包里的
 `tray\install.cmd` 依旧可用；设 `DSH_LAUNCHER_NO_TRAY_INSTALL=1` 可彻底关闭自动安装。
 
-**卸载：**
+**卸载** —— 两半各自独立，这是刻意的：
 
-1. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`。DSH 还在运行时，插件会察觉自己的包
-   已被删除，并在约半分钟内把托盘一起卸掉；重启一次 DSH 则收尾更干净。
-2. 也可以先手动卸托盘：**右键托盘图标 →「卸载托盘…」**（或运行 `%LOCALAPPDATA%\DSH-Launcher\uninstall.cmd`，
+1. 托盘：**右键托盘图标 →「卸载托盘…」**（或运行 `%LOCALAPPDATA%\DSH-Launcher\uninstall.cmd`，
    或用包里的 `tray\uninstall.cmd`）。它会停掉正在运行的托盘、清掉开机自启项与桌面快捷方式、
    删除安装目录，但**不会**停 DSH —— DSH 只是不再被托管，你想什么时候关就什么时候关。
    加 `-DryRun` 可先看它会删什么（不改动任何东西），加 `-KeepState` 则保留 `state\` 里的日志。
+2. 插件：`dsh plugin --profile web remove @mostkia/dsh-launcher`，然后重启一次 DSH。
+   **这条命令不会删除托盘。** 插件无法可靠察觉自己被卸载（真机实测：运行中的进程仍持有插件、
+   始终没发现 profile 的变化），所以我们宁可如实说明，也不承诺一个不会发生的自动清理 ——
+   卸托盘就用第 1 步。反过来，手动卸托盘**会**被记住：插件不会再把托盘装回来。
 
 ## 环境要求
 

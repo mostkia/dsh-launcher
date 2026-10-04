@@ -52,18 +52,20 @@ Changed your mind about the tray? Remove it (below) and the plugin leaves it alo
 then on. Prefer to install it by hand? `tray\install.cmd` in the package still does
 that, and `DSH_LAUNCHER_NO_TRAY_INSTALL=1` stops the automatic install entirely.
 
-**To uninstall:**
+**To uninstall** — two independent halves, deliberately:
 
-1. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`. While DSH is
-   still running, the plugin notices that its own package is gone and removes the tray
-   with it (within about half a minute); restarting DSH settles anything left over.
-2. Or take the tray off first, by hand: **right-click the tray icon → Uninstall tray…**
-   (or run `uninstall.cmd` from `%LOCALAPPDATA%\DSH-Launcher`, or `tray\uninstall.cmd`
-   from the package). It stops a running tray, clears the start-at-logon entry and the
-   desktop shortcut, and deletes the install directory. It never stops DSH: DSH simply
-   stops being supervised, and you close it whenever you like. Add `-DryRun` to see what
-   it would remove without changing anything, or `-KeepState` to keep the logs in
-   `state\`.
+1. The tray: **right-click the tray icon → Uninstall tray…** (or run `uninstall.cmd`
+   from `%LOCALAPPDATA%\DSH-Launcher`, or `tray\uninstall.cmd` from the package). It
+   stops a running tray, clears the start-at-logon entry and the desktop shortcut, and
+   deletes the install directory. It never stops DSH: DSH simply stops being
+   supervised, and you close it whenever you like. Add `-DryRun` to see what it would
+   remove without changing anything, or `-KeepState` to keep the logs in `state\`.
+2. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`, then restart
+   DSH. **This does not remove the tray.** The plugin cannot reliably notice its own
+   removal — measured on a real machine, the running process kept the plugin and never
+   saw the profile change — so rather than promise a cleanup that does not happen,
+   taking the tray off stays step 1. Removing the tray by hand *is* remembered: the
+   automatic install will not put it back.
 
 ## Requirements
 

@@ -72,7 +72,6 @@ const ctx = {
 // never race the checks below; the lifecycle block turns it off for its own calls.
 const LIFECYCLE_CALLS = join(SANDBOX_HOME, 'lifecycle-calls.txt');
 const FAKE_INSTALLER = join(SANDBOX_HOME, 'fake-install.ps1');
-const FAKE_UNINSTALLER = join(SANDBOX_HOME, 'fake-uninstall.ps1');
 const INSTALLED_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 writeFileSync(
   FAKE_INSTALLER,
@@ -89,9 +88,7 @@ writeFileSync(
   ].join('\r\n'),
   'utf8',
 );
-writeFileSync(FAKE_UNINSTALLER, "Add-Content -LiteralPath '" + LIFECYCLE_CALLS + "' -Value 'uninstall'\r\n", 'utf8');
 process.env.DSH_LAUNCHER_TRAY_INSTALLER = FAKE_INSTALLER;
-process.env.DSH_LAUNCHER_TRAY_UNINSTALLER = FAKE_UNINSTALLER;
 process.env.DSH_LAUNCHER_NO_TRAY_INSTALL = '1';
 
 const mod = await import(MODULE_URL);
@@ -289,16 +286,9 @@ const ON_WINDOWS = process.platform === 'win32';
 // the whole block is Windows-only, because the tray is: on Linux both steps must
 // report `windows-only` instead of pretending (the CI matrix runs this suite there).
 if (ON_WINDOWS) {
-  const { ensureTrayInstalled, checkTrayRemoval, trayState } = mod;
+  const { ensureTrayInstalled, trayState } = mod;
   const trayDir = join(SANDBOX_HOME, 'DSH-Launcher');
   const callLines = () => (existsSync(LIFECYCLE_CALLS) ? readFileSync(LIFECYCLE_CALLS, 'utf8').split(/\r?\n/).filter(Boolean) : []);
-  const profileDir = join(SANDBOX_HOME, 'fake-profile');
-  mkdirSync(profileDir, { recursive: true });
-  const writeProfile = (withUs) => writeFileSync(
-    join(profileDir, 'package.json'),
-    JSON.stringify({ name: 'web', dsh: { profile: { bundles: [] } }, dependencies: withUs ? { '@mostkia/dsh-launcher': 'link:somewhere' } : {} }),
-    'utf8',
-  );
 
   // Let the install timer apply() started run its course: with the opt-out in place it
   // must report the skip, which is what proves the timer is wired and reporting.
@@ -349,22 +339,6 @@ if (ON_WINDOWS) {
   check('a deliberate tray removal is remembered', fifth.action === 'skipped' && fifth.reason === 'opted-out', JSON.stringify(fifth));
   rmSync(optOutMarker, { force: true });
 
-  // Removal detection: while the profile still lists the package, nothing happens...
-  process.env.DSH_LAUNCHER_PROFILE_DIR = profileDir;
-  writeProfile(true);
-  const idle = await checkTrayRemoval();
-  check('still listed in the profile -> no cleanup', idle.action === 'idle' && idle.reason === 'still-installed', JSON.stringify(idle));
-  check('and no uninstall was attempted', callLines().includes('uninstall') === false, callLines().join(','));
-
-  // ...and once the dependency entry is gone, the tray goes with the package.
-  writeProfile(false);
-  const removed = await checkTrayRemoval();
-  check('removed from the profile -> the tray is uninstalled', removed.action === 'tray-removed', JSON.stringify(removed));
-  check('the installed copy of the uninstaller ran', callLines().includes('uninstall'), callLines().join(','));
-  const again = await checkTrayRemoval();
-  check('the cleanup can only happen once', again.action === 'idle' && again.reason === 'already-cleaned', JSON.stringify(again));
-  delete process.env.DSH_LAUNCHER_PROFILE_DIR;
-
   {
     const res = makeRes();
     routes.get(PREFIX + '/status')(makeReq('GET'), res);
@@ -378,9 +352,6 @@ if (ON_WINDOWS) {
   const skipped = await mod.ensureTrayInstalled();
   check('off Windows the automatic install reports windows-only',
     skipped.action === 'skipped' && skipped.reason === 'windows-only', JSON.stringify(skipped));
-  const idle = await mod.checkTrayRemoval();
-  check('off Windows the removal check reports windows-only',
-    idle.action === 'idle' && idle.reason === 'windows-only', JSON.stringify(idle));
   const state = mod.trayState();
   check('off Windows the tray state says unsupported', state.supported === false && state.installed === false, JSON.stringify(state));
 }

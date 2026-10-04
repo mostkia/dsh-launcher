@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.1 — 2026-10-03
+
+### Fixed
+
+- **Withdrawn: the plugin used to try to remove the tray when the package was
+  removed.** On a real machine that did not happen - after
+  `dsh plugin --profile web remove` the running process kept the plugin and never
+  noticed the profile change, even after a minute. A promise the code cannot keep is
+  worse than no promise, so the detection step is gone: removing the tray is the tray
+  menu item (or `uninstall.cmd` in the install directory) again, and both READMEs say
+  so plainly. `tray\uninstall.ps1` also loses the `-FromPlugin` switch that existed
+  only for that path.
+
+### Unchanged
+
+- Adding the package still installs the tray automatically on the next DSH start.
+- Removing the tray by hand still leaves the opt-out marker next to the install
+  folder, so the automatic install does not put it back.
+
 ## 0.2.0 — 2026-10-03
 
 ### Changed
