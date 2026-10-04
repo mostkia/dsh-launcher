@@ -126,9 +126,6 @@ try {
     Assert 'install directory is gone' (-not (Test-Path -LiteralPath $s.dir))
     Assert 'shortcut is gone' (-not (Test-Path -LiteralPath $s.lnk))
     Assert 'registry value is gone' ($null -eq (Get-ScratchRunValue))
-    # Removing the tray by hand is a decision the plugin must not undo on its next
-    # start, so the uninstaller records it next to the install directory.
-    Assert 'the opt-out marker was written' (Test-Path -LiteralPath ($s.dir + '.optout'))
 
     # ---------------------------------------------------------------- case 3
     Write-Host '== case 3: -KeepState keeps the logs =='

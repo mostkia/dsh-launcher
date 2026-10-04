@@ -243,28 +243,10 @@ if (-not (Test-Path -LiteralPath $InstallDir)) {
     }
 }
 
-# ------------------------------------------------- 5. remember the user's decision
-# Removing the tray is a deliberate act - the tray menu, or this script - and the
-# plugin installs the tray automatically, so without this marker somebody who wanted
-# the plugin *without* the tray would find it back on the next restart. The marker
-# lives next to the install folder, so deleting that folder cannot delete the decision,
-# and install.ps1 clears it, so a deliberate reinstall works.
-$marker = Join-Path ([System.IO.Path]::GetDirectoryName($InstallDir)) ([System.IO.Path]::GetFileName($InstallDir) + '.optout')
-if ($DryRun) {
-    Report ('would mark the tray as removed on purpose: ' + $marker)
-} else {
-    try {
-        [System.IO.File]::WriteAllText($marker, ((Get-Date).ToString('o') + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
-        Report ('marked the tray as removed on purpose: ' + $marker)
-    } catch {
-        Warn ('could not write the opt-out marker: ' + $_.Exception.Message)
-    }
-}
-
-# ------------------------------------------------------------------- 6. summary
+# ------------------------------------------------------------------- 5. summary
 Report 'the DSH that the tray supervised is still running: stop it with the power button or by closing it'
 Report 'to remove the plugin itself: dsh plugin --profile web remove @mostkia/dsh-launcher'
-Report 'to install the tray again: tray\install.cmd from the package (clears the opt-out marker)'
+Report 'to install the tray again: tray\install.cmd from the package, or just restart DSH'
 if ($script:Warnings.Count -gt 0) {
     Report ('finished with ' + $script:Warnings.Count + ' warning(s)')
     exit 1

@@ -331,13 +331,12 @@ if (ON_WINDOWS) {
   check('DSH_LAUNCHER_NO_TRAY_INSTALL=1 disables the automatic install',
     fourth.action === 'skipped' && fourth.reason === 'disabled-by-env', JSON.stringify(fourth));
 
-  // A tray the user removed on purpose leaves a marker; the automatic install has to
-  // respect it, or "uninstall the tray" would only last until the next restart.
-  const optOutMarker = join(SANDBOX_HOME, 'DSH-Launcher.optout');
-  writeFileSync(optOutMarker, 'x', 'utf8');
+  // Installing always installs everything: a removed tray therefore comes back on the
+  // next DSH start, which is what a reinstall should do.
+  rmSync(trayDir, { recursive: true, force: true });
   const fifth = await ensureTrayInstalled();
-  check('a deliberate tray removal is remembered', fifth.action === 'skipped' && fifth.reason === 'opted-out', JSON.stringify(fifth));
-  rmSync(optOutMarker, { force: true });
+  check('a removed tray is installed again on the next start',
+    fifth.action === 'installed' && fifth.version === INSTALLED_VERSION, JSON.stringify(fifth));
 
   {
     const res = makeRes();

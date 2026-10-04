@@ -64,7 +64,7 @@ dsh plugin --profile web remove @mostkia/dsh-launcher
 两半都带自测，不需要真实 dsh 会话：
 
 ```bash
-# 宿主半部：端点、守卫、退出码、自启状态（23 项）
+# 宿主半部：端点、守卫、退出码、自启状态（34 项；托盘相关的分支会按平台自动切换）
 node test/host-half.test.mjs
 
 # 客户端半部：槽位注册与中英文案完整性（无需浏览器）

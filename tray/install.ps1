@@ -55,16 +55,6 @@ foreach ($f in $Files) {
     Write-Host ('[install] copied ' + $f)
 }
 
-# ------------------------------------------------------------- opt-out marker
-# A user who removed the tray on purpose left this marker behind (uninstall.ps1 wrote
-# it). Installing again is that decision being taken back, so clear it - otherwise the
-# plugin's automatic install would have to keep second-guessing a stale "do not".
-$optOut = Join-Path ([System.IO.Path]::GetDirectoryName($TargetDir)) ([System.IO.Path]::GetFileName($TargetDir) + '.optout')
-if (Test-Path -LiteralPath $optOut) {
-    Remove-Item -LiteralPath $optOut -Force
-    Write-Host '[install] cleared the "tray removed on purpose" marker'
-}
-
 # ------------------------------------------------------------- version + paths
 $Version = '0.0.0'
 try {

@@ -1,16 +1,16 @@
 # @mostkia/dsh-launcher
 
-Power controls for DeepSeek Harness (DSH) plus a Windows tray launcher that can
-start it, restart it and show its console output.
+Power controls for DeepSeek Harness (DSH): one power button in the sidebar, plus a
+Windows tray launcher that can start it, restart it and show its console output.
 
 🌏 **English** · [简体中文](./README.zh.md)
 
 ## What you get
 
-A complete power-and-launch plugin for stock DSH: shut-down and restart buttons
-(no more Ctrl+C in a terminal to stop the server), a real system launcher (a
-desktop shortcut plus start-at-logon), and tray management (no ugly console box
-left sitting on screen).
+A complete power-and-launch plugin for stock DSH: shut-down and restart buttons (no
+more Ctrl+C in a terminal to stop the server), a real system launcher (a desktop
+shortcut plus start-at-logon), and tray management (no ugly console box left sitting
+on screen).
 
 | Part | Where it lives | What it does |
 |---|---|---|
@@ -19,9 +19,9 @@ left sitting on screen).
 
 ## Screenshots
 
-| Power dialog, light | Power dialog, dark | Sidebar action |
+| Power dialog, light | Sidebar power button | Power dialog, dark |
 |:--:|:--:|:--:|
-| ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) | ![the power action beside Settings in the sidebar](docs/screenshots/sidebar-power.png) |
+| ![power dialog in the light theme](docs/screenshots/power-dialog-light.png) | ![the power action beside Settings in the sidebar](docs/screenshots/sidebar-power.png) | ![power dialog in the dark theme](docs/screenshots/power-dialog-dark.png) |
 
 The dialog follows the host theme because every colour, radius and shadow comes
 from theme tokens. The action itself uses the shell's own sidebar foot seat, beside
@@ -31,73 +31,62 @@ Settings, and takes no row of its own.
 
 ```bash
 # from GitHub; pinning the release tag keeps it reproducible:
-dsh plugin --profile web add github:mostkia/dsh-launcher#v0.2.0
+dsh plugin --profile web add github:mostkia/dsh-launcher#v0.1.0
 ```
 
-Then restart DSH once (`dsh web` or the existing launcher) so the new bundle is
-composed, and refresh the page.
+Then restart DSH once. The Windows tray is installed during that restart, by the
+plugin itself - it carries the tray and puts it in place, which is why the system may
+ask for permission (it installs the tray and creates the shortcut). After the restart
+the desktop shortcut exists: close DSH once more and start it from that shortcut, and
+every feature is available. Start-at-logon is off by default; turn it on from the tray
+menu, or from the power dialog inside DSH, if you want it.
 
-**That is the whole install.** The plugin carries the Windows tray and puts it in
-place itself on that first start: `%LOCALAPPDATA%\DSH-Launcher`, a **DSH Launcher**
-desktop shortcut, and an uninstaller next to it. A package manager will not run a
-dependency's install script for us (pnpm 10+ blocks them) and the plugin command has no
-hooks, so the plugin installs its own companion - and nothing in there needs
-administrator rights, because the tray lives entirely in your user profile. It never
-turns start-at-logon on; you opt in from the tray menu or the dialog.
+## Uninstall
 
-Start DSH from the **DSH Launcher** shortcut when you want it supervised, which is what
-makes the power button's *Restart* able to relaunch it.
+```bash
+# remove the power plugin from this machine
+dsh plugin --profile web remove @mostkia/dsh-launcher
+```
 
-Changed your mind about the tray? Remove it (below) and the plugin leaves it alone from
-then on. Prefer to install it by hand? `tray\install.cmd` in the package still does
-that, and `DSH_LAUNCHER_NO_TRAY_INSTALL=1` stops the automatic install entirely.
+To remove the tray: open the tray, find the DSH launcher (the black whale icon) and
+**right-click the tray icon → Uninstall tray…**. That stops the running tray and clears
+the start-at-logon entry, the desktop shortcut and the launcher itself.
 
-**To uninstall** — two independent halves, deliberately:
-
-1. The tray: **right-click the tray icon → Uninstall tray…** (or run `uninstall.cmd`
-   from `%LOCALAPPDATA%\DSH-Launcher`, or `tray\uninstall.cmd` from the package). It
-   stops a running tray, clears the start-at-logon entry and the desktop shortcut, and
-   deletes the install directory. It never stops DSH: DSH simply stops being
-   supervised, and you close it whenever you like. Add `-DryRun` to see what it would
-   remove without changing anything, or `-KeepState` to keep the logs in `state\`.
-2. The plugin: `dsh plugin --profile web remove @mostkia/dsh-launcher`, then restart
-   DSH. **This does not remove the tray.** The plugin cannot reliably notice its own
-   removal — measured on a real machine, the running process kept the plugin and never
-   saw the profile change — so rather than promise a cleanup that does not happen,
-   taking the tray off stays step 1. Removing the tray by hand *is* remembered: the
-   automatic install will not put it back.
+**The power plugin and the tray launcher uninstall independently, and that is
+deliberate: if you only want part of the set, keep that part.**
 
 ## Requirements
 
-- DSH host version: **0.1.7 or newer** (it uses `sidebar.footer.action`,
-  `ctx.appExit` and the `webServer` registration API).
+- DSH host version: **0.1.7-rc.1 || 0.1.7-rc.2, or newer** (it uses
+  `sidebar.footer.action`, `ctx.appExit` and the `webServer` registration API).
 - Node `^22.19.0 || >=24.0.0` (DSH's own requirement).
-- The tray and start-at-logon are **Windows only**. The plugin itself is
-  platform-neutral and reports that cleanly.
+- The tray and start-at-logon are **Windows only** for now; the plugin itself is
+  platform-neutral and says so clearly where they are not supported.
 
 ## Using it
 
-- **Sidebar power button** → `Shut down` exits DSH gracefully (code 0);
-  `Restart` exits with the restart code so the tray relaunches it.
-- **Start at logon** — the switch at the bottom of that dialog, and the
-  checkable tray menu item, read and write the *same* registry value
+- **Sidebar power button**: `Shut down` = graceful exit (code 0); `Restart` = exits
+  with the restart code, so the tray relaunches it.
+- **Start at logon**: the switch at the bottom of the power dialog and the checkable
+  tray menu item read and write the **same registry value**
   (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` → `DSHLauncher`).
-- **Tray icon** — double-click to read the captured console output; the menu has
+- **Tray icon**: double-click to read the captured console output; the menu has
   show/hide, start, restart, open DSH, open the log file, start at logon, and
   "shut down DSH and exit".
 
 ## HTTP surface (for scripts and other launchers)
 
-All endpoints reject any `Origin` that is not this machine's loopback address
-(`403`) and live under the plugin's own namespace. A request without an `Origin`
-header (a script, `curl`) is allowed by design: a browser always sends one on a
-POST, so an absent header is what a CSRF guard should ignore — while a present one
-must never be trusted just because its host matches the request's `Host`, which is
-exactly the DNS-rebinding hole an earlier version had.
+Every endpoint rejects an `Origin` that is not **this machine's loopback address**
+(always `403`), and all of them live under the plugin's own namespace. A request
+without an `Origin` (a script, `curl`) is allowed by design: a browser always sends
+one on a POST, so the absent header is what a CSRF guard should ignore — while a
+**present** `Origin` must never be trusted just because its host matches the request's
+`Host`. An earlier version did exactly that, and it was a DNS-rebinding hole (found in
+review).
 
 | Method | Path | Meaning |
 |---|---|---|
-| `GET` | `/_dsh-launcher/status` | platform, pid, `supervised`, autostart state |
+| `GET` | `/_dsh-launcher/status` | platform, pid, whether a supervisor is there, autostart state |
 | `POST` | `/_dsh-launcher/shutdown` | graceful exit, code 0 |
 | `POST` | `/_dsh-launcher/restart` | graceful exit, code 42 (only when supervised) |
 | `POST` | `/_dsh-launcher/autostart/enable` | register the logon-start entry |
@@ -108,47 +97,42 @@ exactly the DNS-rebinding hole an earlier version had.
 Both halves ship with a test that needs no real DSH session:
 
 ```bash
-# host half: endpoints, guards, exit codes, autostart states (23 checks)
+# host half: endpoints, guards, exit codes, autostart states (34 checks)
 node test/host-half.test.mjs
 
-# client half: slot registration and locale completeness, no browser needed
+# client half: slot registration and zh/en string completeness, no browser needed
 node test/client-half.test.mjs
 
 # tray: the supervision probe and both restart paths, against a fake DSH
 powershell -NoProfile -ExecutionPolicy Bypass -File test\tray-supervision.ps1
 ```
 
-The tray test runs `test/fake-dsh.mjs` (a tiny HTTP server that speaks the
-plugin's endpoints) as the supervised child on a scratch port, so a real DSH is
-never started, killed or restarted. It pins the decisions that matter: with a
-supervised child the tray asks the plugin and waits for the restart code; with an
-unsupervised one it refuses to call the endpoint (which would answer `ok:false`)
-and forces the restart itself; and when the port is held by something that does
-not speak the plugin's status route — the plugin failed to load, or another plugin
-owns the path — it says so and forces the restart instead of claiming the plugin
-agreed. Inside a confined shell `taskkill` is denied, so the kill step of the
-forced path cannot be observed there; the runner notes the limitation and the fake
-child exits on its own instead.
+The tray test runs `test/fake-dsh.mjs` (a tiny HTTP server that speaks the plugin's
+endpoints) as the supervised child on a scratch port, so a real DSH is never started,
+killed or restarted. It pins the decisions that matter: with a supervised child the
+tray asks the plugin and waits for the restart code; with an unsupervised one it
+refuses to call the endpoint that would answer `ok:false` and forces the restart
+itself. Inside a confined shell `taskkill` is denied, so the kill step of the forced
+path cannot be observed there; the runner notes the limitation and the fake child
+exits on its own instead.
 
-Maintainers: [RELEASE.md](./RELEASE.md) carries the pre-flight checks, the
-tagging steps and the optional market listing. Those suites, plus the
-package-contents check, run in CI on every push and pull request
-(`.github/workflows/tests.yml`).
+Maintainers: [RELEASE.md](./RELEASE.md) carries the pre-flight checks, the tagging
+steps and the optional market listing. Those suites, plus a package-contents check,
+run in CI on every push and pull request (`.github/workflows/tests.yml`).
 
 ## Design notes
 
 - **No runtime dependencies, on purpose.** Everything `@deepseek-ai/*` is a
-  peerDependency, never a dependency: a package manager must never be able to
-  install a second physical copy of a shared DSH package into your profile,
-  because that splits private Symbols and breaks the host's scheduler lookup.
-- **The client half imports nothing.** No `@deepseek-ai/dsh-client-ui-*` package
-  is required; the UI is hand-built from theme tokens (`--dsw-alias-*`,
-  `--dsw-radius-*`, `--dsw-shadow-*`) so it follows light/dark and the host
-  design language. All visible text goes through the client locale service
-  (zh + en).
-- **No conflict with other plugins.** The plugin claims only its own paths and
-  does not attempt to coexist with, or replace, `dsh-shutdown` at the routing
-  level; each works when installed alone.
+  peerDependency, never a dependency: if a package manager installs a second physical
+  copy of a shared DSH package into the profile, private Symbols split and the host's
+  scheduler fails outright.
+- **The client half imports nothing.** No `@deepseek-ai/dsh-client-ui-*` package is
+  required; the UI is hand-built from theme tokens (`--dsw-alias-*`, `--dsw-radius-*`,
+  `--dsw-shadow-*`) so it follows light/dark and the host design language. All visible
+  text goes through the client locale service (zh + en).
+- **No conflict with other plugins.** It claims only its own paths and does not
+  attempt to coexist with, or replace, `dsh-shutdown` at the routing level; each works
+  when installed alone.
 
 ## Credit and licence
 

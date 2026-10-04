@@ -183,21 +183,6 @@ function trayInstallDir() {
 }
 
 /**
- * Marker the tray uninstaller leaves behind when a *user* removed the tray. It sits
- * next to the install folder (so deleting the folder cannot delete the decision) and
- * the automatic install respects it - otherwise removing the tray by hand would mean
- * the plugin puts it back on the next start, which is exactly the kind of behaviour
- * that makes people distrust a plugin. Running install.cmd removes the marker, so a
- * deliberate reinstall works.
- * @returns the marker path, or null without a profile.
- */
-function trayOptOutPath() {
-  const base = process.env.LOCALAPPDATA;
-  if (typeof base !== 'string' || base === '') return null;
-  return join(base, TRAY_DIR_NAME + '.optout');
-}
-
-/**
  * What the tray half looks like right now. "Installed" means the marker is readable
  * *and* the files the plugin has to drive are there: a marker left behind after a
  * manual cleanup must not read as a working tray.
@@ -267,8 +252,6 @@ function runPowerShellFile(script, args, timeoutMs) {
 async function ensureTrayInstalled() {
   if (!IS_WINDOWS) return { action: 'skipped', reason: 'windows-only' };
   if (process.env[NO_AUTO_INSTALL_ENV] === '1') return { action: 'skipped', reason: 'disabled-by-env' };
-  const optOut = trayOptOutPath();
-  if (optOut !== null && existsSync(optOut)) return { action: 'skipped', reason: 'opted-out' };
   const before = trayState();
   if (before.installed && before.upToDate) {
     return { action: 'skipped', reason: 'already-installed', version: before.version };
