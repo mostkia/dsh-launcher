@@ -27,7 +27,7 @@ tray suite on Windows PowerShell 5.1, the shell it is verified against).
 Then confirm nothing from a single workstation leaked into the published files:
 
 ```bash
-git grep -nE 'D:\\|C:\\Users|@example\.com' -- .   # must print nothing
+git grep -nE 'D:\\|C:\\Users|@[A-Za-z0-9.-]+\.(com|net|cn|org)' -- .   # must print nothing
 git grep -nE 'LOCALAPPDATA|USERPROFILE|SystemRoot' -- .   # env-based only, expected
 ```
 
